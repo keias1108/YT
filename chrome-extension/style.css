@@ -1,0 +1,70 @@
+/**
+ * 유튜브 페이지에 추가되는 버튼 스타일
+ */
+
+#senior-channel-btn-container {
+    display: inline-flex !important;
+    align-items: center !important;
+    margin: 0 8px !important;
+    z-index: 9999 !important;
+    position: relative !important;
+}
+
+/* 기본 버튼 스타일 (등록 안된 채널) */
+.senior-channel-button {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    margin: 0 !important;
+    padding: 10px 20px !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 20px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3) !important;
+    z-index: 9999 !important;
+    position: relative !important;
+    white-space: nowrap !important;
+}
+
+/* 등록된 채널 버튼 스타일 (초록색) */
+.senior-channel-button.registered {
+    background: linear-gradient(135deg, #34d399 0%, #10b981 100%) !important;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
+}
+
+.senior-channel-button.registered:hover {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5) !important;
+}
+
+/* 검색 결과 페이지 - 시니어 채널 마크 */
+.senior-channel-mark {
+    display: inline-block !important;
+    margin-left: 8px !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+    vertical-align: middle !important;
+    cursor: help !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+.senior-channel-button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5) !important;
+}
+
+.senior-channel-button:disabled {
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+
+.senior-channel-button:active {
+    transform: translateY(0) !important;
+}

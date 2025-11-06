@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라벨링 - 시니어 유튜브 트렌드</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .labeling-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .video-card {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .video-header {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .video-thumbnail-large {
+            width: 240px;
+            height: 135px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .video-info {
+            flex: 1;
+        }
+
+        .video-info h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .video-meta {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.8;
+        }
+
+        .score-display {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .highlights-display {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .highlights-display h4 {
+            margin-bottom: 10px;
+            color: #667eea;
+            font-size: 0.95em;
+        }
+
+        .labeling-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn-label {
+            flex: 1;
+            padding: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-yes {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-yes:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .btn-no {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-no:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .btn-skip {
+            background: #6c757d;
+            color: white;
+            flex: 0.5;
+        }
+
+        .btn-skip:hover {
+            background: #5a6268;
+        }
+
+        .progress-bar {
+            margin-bottom: 30px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .progress-text {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .no-videos {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .no-videos h2 {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 비디오 라벨링</h1>
+            <p class="subtitle">SeniorScore가 높은 비디오를 검수하여 모델 학습 데이터 생성</p>
+        </header>
+
+        <div class="labeling-container">
+            <!-- 진행 상황 -->
+            <div class="progress-bar">
+                <p class="progress-text">
+                    라벨링 완료: <span id="labeled-count">0</span> / 남은 비디오: <span id="remaining-count">-</span>
+                </p>
+            </div>
+
+            <!-- 비디오 카드 -->
+            <div id="video-cards-container">
+                <div class="no-videos">
+                    <h2>로딩 중...</h2>
+                    <p>라벨링할 비디오를 불러오는 중입니다.</p>
+                </div>
+            </div>
+
+            <!-- 하단 네비게이션 -->
+            <div style="text-align: center; margin-top: 40px;">
+                <a href="/" class="btn-secondary" style="display: inline-block; text-decoration: none; padding: 12px 30px;">
+                    ← 메인으로 돌아가기
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let unlabeledVideos = [];
+        let currentIndex = 0;
+        let labeledCount = 0;
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUnlabeledVideos();
+        });
+
+        /**
+         * 라벨링 안 된 비디오 불러오기
+         */
+        async function loadUnlabeledVideos() {
+            try {
+                const response = await fetch('/api/labels/unlabeled?limit=50');
+                const result = await response.json();
+
+                if (result.success) {
+                    unlabeledVideos = result.data;
+                    currentIndex = 0;
+
+                    if (unlabeledVideos.length === 0) {
+                        showNoVideos();
+                    } else {
+                        renderCurrentVideo();
+                    }
+                } else {
+                    showError('비디오 로드 실패: ' + result.error);
+                }
+            } catch (error) {
+                console.error('비디오 로드 실패:', error);
+                showError('비디오 로드 실패');
+            }
+        }
+
+        /**
+         * 현재 비디오 렌더링
+         */
+        function renderCurrentVideo() {
+            if (currentIndex >= unlabeledVideos.length) {
+                showNoVideos('모든 비디오 라벨링 완료!');
+                return;
+            }
+
+            const video = unlabeledVideos[currentIndex];
+            const highlights = typeof video.highlights === 'string'
+                ? JSON.parse(video.highlights)
+                : video.highlights;
+
+            const container = document.getElementById('video-cards-container');
+            container.innerHTML = `
+                <div class="video-card">
+                    <div class="video-header">
+                        <img src="${video.thumbnail_url}" alt="썸네일" class="video-thumbnail-large">
+                        <div class="video-info">
+                            <h3>
+                                <a href="https://www.youtube.com/watch?v=${video.video_id}" target="_blank">
+                                    ${video.title}
+                                </a>
+                            </h3>
+                            <div class="video-meta">
+                                <p>채널: ${video.channel_title}</p>
+                                <p>
+                                    SeniorScore: <span class="score-display">${(video.senior_score || 0).toFixed(1)}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="highlights-display">
+                        <h4>근거 (Highlights):</h4>
+                        <p>
+                            ${renderHighlights(highlights)}
+                        </p>
+                    </div>
+
+                    <div class="labeling-actions">
+                        <button class="btn-label btn-yes" onclick="saveLabel('${video.video_id}', true)">
+                            ✅ 시니어 콘텐츠 맞음
+                        </button>
+                        <button class="btn-label btn-no" onclick="saveLabel('${video.video_id}', false)">
+                            ❌ 시니어 콘텐츠 아님
+                        </button>
+                        <button class="btn-label btn-skip" onclick="skipVideo()">
+                            ⏭️ 스킵
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // 진행 상황 업데이트
+            document.getElementById('labeled-count').textContent = labeledCount;
+            document.getElementById('remaining-count').textContent = unlabeledVideos.length - currentIndex;
+        }
+
+        /**
+         * 라벨 저장
+         */
+        async function saveLabel(videoId, isSeniorContent) {
+            try {
+                const response = await fetch('/api/label', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        video_id: videoId,
+                        is_senior_content: isSeniorContent,
+                        labeled_by: 'user',
+                        notes: ''
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    labeledCount++;
+                    currentIndex++;
+                    renderCurrentVideo();
+                } else {
+                    alert('라벨 저장 실패: ' + result.error);
+                }
+            } catch (error) {
+                console.error('라벨 저장 실패:', error);
+                alert('라벨 저장 실패');
+            }
+        }
+
+        /**
+         * 비디오 스킵
+         */
+        function skipVideo() {
+            currentIndex++;
+            renderCurrentVideo();
+        }
+
+        /**
+         * Highlights 렌더링
+         */
+        function renderHighlights(highlights) {
+            const parts = [];
+
+            if (highlights.matched_keywords && highlights.matched_keywords.length > 0) {
+                parts.push(`<strong>키워드:</strong> ${highlights.matched_keywords.join(', ')}`);
+            }
+
+            if (highlights.matched_genres && highlights.matched_genres.length > 0) {
+                parts.push(`<strong>장르:</strong> ${highlights.matched_genres.join(', ')}`);
+            }
+
+            if (highlights.comment_indicators && highlights.comment_indicators.length > 0) {
+                parts.push(`<strong>댓글 지표:</strong> ${highlights.comment_indicators.join(', ')}`);
+            }
+
+            if (highlights.length_category) {
+                parts.push(`<strong>길이:</strong> ${highlights.length_category}`);
+            }
+
+            return parts.length > 0 ? parts.join('<br>') : '근거 없음';
+        }
+
+        /**
+         * 비디오 없음 표시
+         */
+        function showNoVideos(message = '라벨링할 비디오가 없습니다.') {
+            const container = document.getElementById('video-cards-container');
+            container.innerHTML = `
+                <div class="no-videos">
+                    <h2>${message}</h2>
+                    <p>먼저 메인 페이지에서 데이터를 수집하세요.</p>
+                </div>
+            `;
+        }
+
+        /**
+         * 에러 표시
+         */
+        function showError(message) {
+            const container = document.getElementById('video-cards-container');
+            container.innerHTML = `
+                <div class="no-videos">
+                    <h2>오류 발생</h2>
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

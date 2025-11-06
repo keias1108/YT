@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시니어 유튜브 트렌드 추적</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>시니어층 유튜브 트렌드 추적 시스템</h1>
+            <p class="subtitle">한국 시니어층이 실제로 소비하는 트렌딩 영상을 SeniorScore로 필터링</p>
+        </header>
+
+        <!-- 통계 대시보드 -->
+        <section class="stats-panel">
+            <div class="stat-card">
+                <h3>전체 비디오</h3>
+                <p class="stat-value" id="stat-videos">-</p>
+            </div>
+            <div class="stat-card">
+                <h3>스냅샷</h3>
+                <p class="stat-value" id="stat-snapshots">-</p>
+            </div>
+            <div class="stat-card">
+                <h3>라벨링</h3>
+                <p class="stat-value" id="stat-labels">-</p>
+            </div>
+            <div class="stat-card">
+                <h3>최신 수집일</h3>
+                <p class="stat-value" id="stat-latest">-</p>
+            </div>
+        </section>
+
+        <!-- 데이터 수집 패널 -->
+        <section class="collect-panel">
+            <h2>📊 데이터 수집</h2>
+            <div class="form-group">
+                <label>카테고리 선택 (복수 선택 가능):</label>
+                <div id="categories-list" class="checkbox-group">
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>카테고리당 수집 수:</label>
+                <input type="number" id="max-results" value="50" min="1" max="50">
+            </div>
+            <div class="info-text" style="margin-bottom: 15px;">
+                💡 수집은 항상 <strong>오늘 날짜</strong>로 저장됩니다. 과거 조회는 아래 "비디오 조회" 섹션에서 가능합니다.
+            </div>
+            <button id="btn-collect" class="btn-primary">수집 시작</button>
+            <div id="collect-status" class="status-message"></div>
+        </section>
+
+        <!-- 비디오 조회 패널 -->
+        <section class="view-panel">
+            <h2>🎬 비디오 조회</h2>
+            <div class="filter-row">
+                <div class="form-group">
+                    <label>조회 날짜:</label>
+                    <input type="date" id="view-date" value="">
+                </div>
+                <div class="form-group">
+                    <label>SeniorScore 최소값:</label>
+                    <input type="number" id="senior-threshold" value="5" min="0" step="0.5">
+                </div>
+                <button id="btn-load" class="btn-secondary">조회</button>
+            </div>
+            <div id="video-count" class="info-text"></div>
+        </section>
+
+        <!-- 비디오 테이블 -->
+        <section class="video-table-container">
+            <table id="video-table">
+                <thead>
+                    <tr>
+                        <th>순위</th>
+                        <th>썸네일</th>
+                        <th>제목</th>
+                        <th>채널</th>
+                        <th>조회수</th>
+                        <th>SeniorScore</th>
+                        <th>근거 (Highlights)</th>
+                        <th>Δviews (14일)</th>
+                    </tr>
+                </thead>
+                <tbody id="video-table-body">
+                    <tr>
+                        <td colspan="8" class="empty-state">
+                            조회 버튼을 눌러 데이터를 불러오세요
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- 푸터 -->
+        <footer>
+            <p>
+                <a href="/channels">📺 채널 관리</a> |
+                <a href="/labeling">라벨링 페이지</a> |
+                <a href="https://github.com" target="_blank">GitHub</a>
+            </p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

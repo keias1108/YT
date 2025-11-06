@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시니어 유튜브 트렌드</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 350px;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .info {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .status.success {
+            background: #28a745;
+        }
+
+        .status.error {
+            background: #dc3545;
+        }
+
+        code {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📺 시니어 유튜브 트렌드</h1>
+
+    <div class="info">
+        <p><strong>사용 방법:</strong></p>
+        <ol style="margin-left: 20px; margin-top: 8px;">
+            <li>유튜브 채널 페이지 방문</li>
+            <li>"⭐ 시니어 채널로 등록" 버튼 클릭</li>
+            <li>자동으로 시스템에 등록됨</li>
+        </ol>
+    </div>
+
+    <button id="btn-open-dashboard" class="btn">
+        📊 대시보드 열기
+    </button>
+
+    <button id="btn-open-channels" class="btn">
+        📋 채널 관리
+    </button>
+
+    <div id="status"></div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
