@@ -132,18 +132,19 @@ def collect_trending_videos(
     return stats
 
 
-def calculate_delta_views_for_date(snapshot_date: str, days: int = 14) -> List[Dict[str, Any]]:
+def calculate_delta_views_for_date(snapshot_date: str, days: int = 14, data_source: str = 'all') -> List[Dict[str, Any]]:
     """
     특정 날짜의 모든 비디오에 대해 Δviews 계산
 
     Args:
         snapshot_date: 기준 날짜
         days: 비교 기간 (기본 14일)
+        data_source: 데이터 소스 필터 ('channel', 'category', 'all')
 
     Returns:
         Δviews가 포함된 비디오 리스트
     """
-    snapshots = database.get_snapshots_by_date(snapshot_date)
+    snapshots = database.get_snapshots_by_date_and_source(snapshot_date, data_source)
 
     results = []
     for snapshot in snapshots:
@@ -162,7 +163,8 @@ def get_ranked_senior_videos(
     min_delta_views: int = 0,
     limit: int = 50,
     sort_by: str = 'senior_score',
-    order: str = 'desc'
+    order: str = 'desc',
+    data_source: str = 'channel'
 ) -> List[Dict[str, Any]]:
     """
     시니어 친화 영상 랭킹 가져오기
@@ -174,6 +176,7 @@ def get_ranked_senior_videos(
         limit: 최대 반환 수
         sort_by: 정렬 기준 (view_count, senior_score, delta_views_14d)
         order: 정렬 방향 (asc, desc)
+        data_source: 데이터 소스 ('channel', 'category', 'all')
 
     Returns:
         랭킹 리스트
@@ -181,8 +184,8 @@ def get_ranked_senior_videos(
     if snapshot_date is None:
         snapshot_date = datetime.now().strftime('%Y-%m-%d')
 
-    # Δviews 계산
-    videos = calculate_delta_views_for_date(snapshot_date)
+    # Δviews 계산 (데이터 소스 필터링 적용)
+    videos = calculate_delta_views_for_date(snapshot_date, data_source=data_source)
 
     # 필터링
     filtered = []

@@ -215,6 +215,43 @@ def get_snapshots_by_date(date: str) -> List[Dict[str, Any]]:
     return results
 
 
+def get_snapshots_by_date_and_source(date: str, data_source: str = 'all') -> List[Dict[str, Any]]:
+    """
+    특정 날짜의 스냅샷 조회 (데이터 소스 필터링)
+
+    Args:
+        date: 조회 날짜 (YYYY-MM-DD)
+        data_source: 'channel' (채널 기반), 'category' (카테고리 기반), 'all' (전체)
+
+    Returns:
+        필터링된 스냅샷 리스트
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # 데이터 소스에 따라 WHERE 절 구성
+    if data_source == 'channel':
+        where_clause = "s.snapshot_date = ? AND s.category_id LIKE 'channel:%'"
+    elif data_source == 'category':
+        where_clause = "s.snapshot_date = ? AND s.category_id NOT LIKE 'channel:%'"
+    else:  # 'all'
+        where_clause = "s.snapshot_date = ?"
+
+    cursor.execute(f"""
+        SELECT s.*, v.title, v.channel_title, v.thumbnail_url,
+               ss.score as senior_score, ss.highlights
+        FROM snapshots s
+        JOIN videos v ON s.video_id = v.video_id
+        LEFT JOIN senior_scores ss ON s.id = ss.snapshot_id
+        WHERE {where_clause}
+        ORDER BY s.rank_position
+    """, (date,))
+
+    results = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return results
+
+
 def get_delta_views(video_id: str, days: int = 14) -> Optional[int]:
     """특정 비디오의 Δviews 계산 (최근 N일)"""
     conn = get_connection()

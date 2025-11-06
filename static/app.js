@@ -142,6 +142,7 @@ async function collectData() {
 async function loadVideos() {
     const viewDate = document.getElementById('view-date').value;
     const seniorThreshold = parseFloat(document.getElementById('senior-threshold').value);
+    const dataSource = document.querySelector('input[name="data-source"]:checked').value;
     const tableBody = document.getElementById('video-table-body');
     const countDiv = document.getElementById('video-count');
 
@@ -149,7 +150,7 @@ async function loadVideos() {
     tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">로딩 중...</td></tr>';
 
     try {
-        const response = await fetch(`/api/videos?snapshot_date=${viewDate}&senior_threshold=${seniorThreshold}&limit=100&sort_by=${currentSort}&order=${currentOrder}`);
+        const response = await fetch(`/api/videos?snapshot_date=${viewDate}&senior_threshold=${seniorThreshold}&limit=100&sort_by=${currentSort}&order=${currentOrder}&data_source=${dataSource}`);
         const result = await response.json();
 
         if (result.success) {

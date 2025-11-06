@@ -120,6 +120,8 @@ def get_videos():
                   허용값: view_count, senior_score, delta_views_14d
         - order: 정렬 방향 (기본값: desc)
                 허용값: asc, desc
+        - data_source: 데이터 소스 (기본값: channel)
+                      허용값: channel, category, all
 
     Returns:
         JSON: 비디오 리스트
@@ -130,6 +132,7 @@ def get_videos():
         limit = int(request.args.get('limit', 100))
         sort_by = request.args.get('sort_by', 'senior_score')
         order = request.args.get('order', 'desc')
+        data_source = request.args.get('data_source', 'channel')
 
         if snapshot_date is None:
             snapshot_date = datetime.now().strftime('%Y-%m-%d')
@@ -140,7 +143,8 @@ def get_videos():
             senior_threshold=senior_threshold,
             limit=limit,
             sort_by=sort_by,
-            order=order
+            order=order,
+            data_source=data_source
         )
 
         return jsonify({

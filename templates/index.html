@@ -58,6 +58,23 @@
             <h2>🎬 비디오 조회</h2>
             <div class="filter-row">
                 <div class="form-group">
+                    <label>데이터 소스:</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="data-source" value="channel" checked>
+                            채널 기반
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="data-source" value="category">
+                            카테고리 기반
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="data-source" value="all">
+                            전체 보기
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
                     <label>조회 날짜:</label>
                     <input type="date" id="view-date" value="">
                 </div>

@@ -146,6 +146,28 @@ section h2 {
     margin: 0;
 }
 
+/* 라디오 버튼 그룹 */
+.radio-group {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-weight: normal;
+    margin: 0;
+}
+
+.radio-label input[type="radio"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
 /* 버튼 */
 .btn-primary, .btn-secondary {
     padding: 12px 30px;
