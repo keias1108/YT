@@ -1,11 +1,14 @@
 // 전역 변수
 let allCategories = [];
+let currentSort = 'senior_score';  // 기본 정렬: SeniorScore
+let currentOrder = 'desc';          // 기본 방향: 내림차순
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', () => {
     initializeDateInputs();
     loadStats();
     loadCategories();
+    initializeSortableHeaders();
 
     // 이벤트 리스너 등록
     document.getElementById('btn-collect').addEventListener('click', collectData);
@@ -146,7 +149,7 @@ async function loadVideos() {
     tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">로딩 중...</td></tr>';
 
     try {
-        const response = await fetch(`/api/videos?snapshot_date=${viewDate}&senior_threshold=${seniorThreshold}&limit=100`);
+        const response = await fetch(`/api/videos?snapshot_date=${viewDate}&senior_threshold=${seniorThreshold}&limit=100&sort_by=${currentSort}&order=${currentOrder}`);
         const result = await response.json();
 
         if (result.success) {
@@ -258,4 +261,58 @@ function showStatus(element, message, type) {
     element.textContent = message;
     element.className = `status-message ${type}`;
     element.style.display = 'block';
+}
+
+/**
+ * 정렬 가능한 헤더 초기화
+ */
+function initializeSortableHeaders() {
+    const sortableHeaders = document.querySelectorAll('th.sortable');
+
+    sortableHeaders.forEach(header => {
+        header.addEventListener('click', () => {
+            handleSortClick(header);
+        });
+    });
+}
+
+/**
+ * 정렬 클릭 처리
+ */
+function handleSortClick(header) {
+    const sortBy = header.getAttribute('data-sort');
+
+    // 같은 컬럼 클릭 시 방향 전환, 다른 컬럼 클릭 시 desc로 시작
+    if (currentSort === sortBy) {
+        currentOrder = (currentOrder === 'desc') ? 'asc' : 'desc';
+    } else {
+        currentSort = sortBy;
+        currentOrder = 'desc';  // 새 컬럼은 항상 내림차순부터
+    }
+
+    // 화살표 업데이트
+    updateSortArrows();
+
+    // 데이터 다시 로드
+    loadVideos();
+}
+
+/**
+ * 정렬 화살표 업데이트
+ */
+function updateSortArrows() {
+    const sortableHeaders = document.querySelectorAll('th.sortable');
+
+    sortableHeaders.forEach(header => {
+        const arrow = header.querySelector('.sort-arrow');
+        const sortBy = header.getAttribute('data-sort');
+
+        if (sortBy === currentSort) {
+            header.classList.add('active');
+            arrow.textContent = (currentOrder === 'desc') ? '▼' : '▲';
+        } else {
+            header.classList.remove('active');
+            arrow.textContent = '';
+        }
+    });
 }

@@ -79,10 +79,16 @@
                         <th>썸네일</th>
                         <th>제목</th>
                         <th>채널</th>
-                        <th>조회수</th>
-                        <th>SeniorScore</th>
+                        <th class="sortable" data-sort="view_count">
+                            조회수 <span class="sort-arrow"></span>
+                        </th>
+                        <th class="sortable active" data-sort="senior_score">
+                            SeniorScore <span class="sort-arrow">▼</span>
+                        </th>
                         <th>근거 (Highlights)</th>
-                        <th>Δviews (14일)</th>
+                        <th class="sortable" data-sort="delta_views_14d">
+                            Δviews (14일) <span class="sort-arrow"></span>
+                        </th>
                     </tr>
                 </thead>
                 <tbody id="video-table-body">

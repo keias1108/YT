@@ -116,6 +116,10 @@ def get_videos():
         - snapshot_date: 날짜 (YYYY-MM-DD, 기본값: 오늘)
         - senior_threshold: SeniorScore 최소값 (기본값: 0)
         - limit: 최대 반환 수 (기본값: 100)
+        - sort_by: 정렬 기준 (기본값: senior_score)
+                  허용값: view_count, senior_score, delta_views_14d
+        - order: 정렬 방향 (기본값: desc)
+                허용값: asc, desc
 
     Returns:
         JSON: 비디오 리스트
@@ -124,6 +128,8 @@ def get_videos():
         snapshot_date = request.args.get('snapshot_date')
         senior_threshold = float(request.args.get('senior_threshold', 0))
         limit = int(request.args.get('limit', 100))
+        sort_by = request.args.get('sort_by', 'senior_score')
+        order = request.args.get('order', 'desc')
 
         if snapshot_date is None:
             snapshot_date = datetime.now().strftime('%Y-%m-%d')
@@ -132,7 +138,9 @@ def get_videos():
         videos = data_collector.get_ranked_senior_videos(
             snapshot_date=snapshot_date,
             senior_threshold=senior_threshold,
-            limit=limit
+            limit=limit,
+            sort_by=sort_by,
+            order=order
         )
 
         return jsonify({

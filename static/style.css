@@ -247,6 +247,31 @@ section h2 {
     font-weight: 600;
 }
 
+/* 정렬 가능한 헤더 */
+#video-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+#video-table th.sortable:hover {
+    background: #5568d3;
+}
+
+#video-table th.sortable.active {
+    background: #4c5fd1;
+}
+
+.sort-arrow {
+    font-size: 0.8em;
+    margin-left: 5px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+#video-table th.sortable.active .sort-arrow {
+    color: white;
+}
+
 #video-table tbody tr {
     border-bottom: 1px solid #ddd;
     transition: background 0.2s;
