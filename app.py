@@ -9,6 +9,7 @@ import json
 import database
 import youtube_api
 import data_collector
+import view_score_calculator
 
 app = Flask(__name__)
 
@@ -152,6 +153,87 @@ def get_videos():
             'data': videos,
             'count': len(videos),
             'snapshot_date': snapshot_date
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/videos/recalculate', methods=['POST'])
+def recalculate_view_scores():
+    """
+    ViewScore 실시간 재계산 (슬라이더 조정용)
+
+    Request Body:
+    {
+        "snapshot_date": "2025-11-06",
+        "data_source": "channel",
+        "weights": {
+            "view": 1.5,
+            "subscriber": 0.8,
+            "recency": 1.2,
+            "engagement": 1.0
+        }
+    }
+    """
+    try:
+        data = request.get_json()
+        snapshot_date = data.get('snapshot_date')
+        data_source = data.get('data_source', 'channel')
+        weights = data.get('weights', view_score_calculator.DEFAULT_WEIGHTS)
+
+        if not snapshot_date:
+            snapshot_date = datetime.now().strftime('%Y-%m-%d')
+
+        # 스냅샷 + 채널 정보 조회
+        snapshots = database.get_snapshots_by_date_and_source(snapshot_date, data_source)
+
+        # 채널 정보 일괄 조회
+        channel_ids = list(set([s['channel_id'] for s in snapshots]))
+        channels_dict = {}
+        for cid in channel_ids:
+            ch = database.get_channel_by_id(cid)
+            if ch:
+                channels_dict[cid] = ch
+
+        # ViewScore 재계산
+        results = []
+        for snapshot in snapshots:
+            channel_data = channels_dict.get(snapshot['channel_id'], {})
+
+            try:
+                score_result = view_score_calculator.calculate_view_score(
+                    video_data=snapshot,
+                    snapshot_data=snapshot,
+                    channel_data=channel_data,
+                    weights=weights
+                )
+
+                # 스냅샷 데이터에 추가
+                snapshot['view_score'] = score_result['score']
+                snapshot['view_score_breakdown'] = {
+                    'view': score_result['view_score'],
+                    'subscriber': score_result['subscriber_score'],
+                    'recency': score_result['recency_score'],
+                    'engagement': score_result['engagement_score']
+                }
+                snapshot['metadata'] = score_result['metadata']
+                results.append(snapshot)
+            except Exception as e:
+                print(f"⚠️  ViewScore 계산 실패: {e}")
+                continue
+
+        # 정렬 (ViewScore 내림차순)
+        results.sort(key=lambda x: x.get('view_score', 0), reverse=True)
+
+        return jsonify({
+            'success': True,
+            'data': results[:100],  # 상위 100개만
+            'count': len(results),
+            'weights_used': weights
         })
 
     except Exception as e:

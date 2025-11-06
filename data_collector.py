@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 import youtube_api
 import database
 import senior_classifier
+import view_score_calculator
 
 
 def collect_trending_videos(
@@ -92,30 +93,31 @@ def collect_trending_videos(
                 stats['duplicate_skipped'] += 1
                 continue
 
-            # 3. SeniorScore 계산
-            # (댓글은 API 쿼터 절약을 위해 선택적으로)
-            # comments = youtube_api.get_video_comments(video_id, max_results=50)
-            comments = None  # 일단 댓글 없이
+            # 3. 채널 정보 가져오기 및 저장 (ViewScore 계산에 필요)
+            channel_info_list = youtube_api.get_channel_info([video['channel_id']])
+            channel_info = channel_info_list[0] if channel_info_list else None
+            if channel_info:
+                database.upsert_channel(channel_info)
 
-            senior_score_result = senior_classifier.calculate_senior_score(video, comments)
-            senior_score_result['snapshot_id'] = snapshot_id
+            # 4. ViewScore 계산 (NEW)
+            view_score_result = view_score_calculator.calculate_view_score(
+                video_data=video,
+                snapshot_data=snapshot_data,
+                channel_data=channel_info
+            )
+            view_score_result['snapshot_id'] = snapshot_id
 
-            # 4. SeniorScore 저장
-            database.insert_senior_score(senior_score_result)
-
-            # 5. 채널 정보 업데이트 (선택적)
-            # channel_info = youtube_api.get_channel_info([video['channel_id']])
-            # if channel_info:
-            #     database.upsert_channel(channel_info[0])
+            # 5. ViewScore 저장
+            database.insert_view_score(view_score_result)
 
             # 수집 결과에 추가
-            video['senior_score'] = senior_score_result
+            video['view_score'] = view_score_result
             all_videos.append(video)
 
             category_stats['new'] += 1
             stats['new_videos'] += 1
 
-            print(f"  ✓ {video['title'][:50]} (SeniorScore: {senior_score_result['score']})")
+            print(f"  ✓ {video['title'][:50]} (ViewScore: {view_score_result['score']:.1f})")
 
         stats['categories'][category_id] = category_stats
         stats['total_videos'] += category_stats['collected']
@@ -330,22 +332,35 @@ def collect_from_channels(
                 stats['duplicate_skipped'] += 1
                 continue
 
-            # 3. SeniorScore 계산
-            comments = None  # API 쿼터 절약
-            senior_score_result = senior_classifier.calculate_senior_score(video, comments)
-            senior_score_result['snapshot_id'] = snapshot_id
+            # 3. 채널 정보 조회 (ViewScore 계산에 필요)
+            # 이미 channels 테이블에 있을 가능성이 높으므로 DB에서 먼저 조회
+            channel_info = database.get_channel_by_id(channel_id)
+            if not channel_info:
+                # DB에 없으면 API 호출
+                channel_info_list = youtube_api.get_channel_info([channel_id])
+                channel_info = channel_info_list[0] if channel_info_list else None
+                if channel_info:
+                    database.upsert_channel(channel_info)
 
-            # 4. SeniorScore 저장
-            database.insert_senior_score(senior_score_result)
+            # 4. ViewScore 계산 (NEW)
+            view_score_result = view_score_calculator.calculate_view_score(
+                video_data=video,
+                snapshot_data=snapshot_data,
+                channel_data=channel_info
+            )
+            view_score_result['snapshot_id'] = snapshot_id
+
+            # 5. ViewScore 저장
+            database.insert_view_score(view_score_result)
 
             # 수집 결과에 추가
-            video['senior_score'] = senior_score_result
+            video['view_score'] = view_score_result
             all_videos.append(video)
 
             channel_stats['new'] += 1
             stats['new_videos'] += 1
 
-            print(f"  ✓ {video['title'][:50]} (SeniorScore: {senior_score_result['score']})")
+            print(f"  ✓ {video['title'][:50]} (ViewScore: {view_score_result['score']:.1f})")
 
         stats['channels'][channel_id] = channel_stats
         stats['total_videos'] += channel_stats['collected']

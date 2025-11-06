@@ -55,7 +55,7 @@ def init_database():
         )
     """)
 
-    # 3. senior_scores 테이블: 시니어 점수 계산 결과
+    # 3. senior_scores 테이블: 시니어 점수 계산 결과 (DEPRECATED - 사용 안함)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS senior_scores (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,6 +69,35 @@ def init_database():
             length_score REAL DEFAULT 0,
             highlights TEXT,  -- JSON: 매칭된 키워드, 근거 등
             calculated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (video_id) REFERENCES videos(video_id),
+            FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
+        )
+    """)
+
+    # 3.5. view_scores 테이블: ViewScore 계산 결과 (NEW)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS view_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            video_id TEXT NOT NULL,
+            snapshot_id INTEGER,
+            score REAL NOT NULL,
+
+            -- 각 요소별 점수
+            view_score REAL DEFAULT 0,
+            subscriber_score REAL DEFAULT 0,
+            recency_score REAL DEFAULT 0,
+            engagement_score REAL DEFAULT 0,
+
+            -- 사용된 가중치
+            view_weight REAL DEFAULT 1.0,
+            subscriber_weight REAL DEFAULT 1.0,
+            recency_weight REAL DEFAULT 1.0,
+            engagement_weight REAL DEFAULT 1.0,
+
+            -- 메타데이터 (JSON: 원본 데이터, 디버깅용)
+            metadata TEXT,
+            calculated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
             FOREIGN KEY (video_id) REFERENCES videos(video_id),
             FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
         )
@@ -105,7 +134,10 @@ def init_database():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_date ON snapshots(snapshot_date)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_video ON snapshots(video_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_senior_scores_video ON senior_scores(video_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_view_scores_video ON view_scores(video_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_view_scores_snapshot ON view_scores(snapshot_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_labels_video ON labels(video_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_videos_channel ON videos(channel_id)")  # JOIN 성능 향상
 
     conn.commit()
     conn.close()
@@ -195,6 +227,37 @@ def insert_senior_score(score_data: Dict[str, Any]) -> None:
     conn.close()
 
 
+def insert_view_score(score_data: Dict[str, Any]) -> None:
+    """ViewScore 삽입"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO view_scores
+        (video_id, snapshot_id, score,
+         view_score, subscriber_score, recency_score, engagement_score,
+         view_weight, subscriber_weight, recency_weight, engagement_weight,
+         metadata)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        score_data['video_id'],
+        score_data.get('snapshot_id'),
+        score_data['score'],
+        score_data.get('view_score', 0),
+        score_data.get('subscriber_score', 0),
+        score_data.get('recency_score', 0),
+        score_data.get('engagement_score', 0),
+        score_data.get('view_weight', 1.0),
+        score_data.get('subscriber_weight', 1.0),
+        score_data.get('recency_weight', 1.0),
+        score_data.get('engagement_weight', 1.0),
+        json.dumps(score_data.get('metadata', {}), ensure_ascii=False)
+    ))
+
+    conn.commit()
+    conn.close()
+
+
 def get_snapshots_by_date(date: str) -> List[Dict[str, Any]]:
     """특정 날짜의 모든 스냅샷 조회"""
     conn = get_connection()
@@ -202,6 +265,7 @@ def get_snapshots_by_date(date: str) -> List[Dict[str, Any]]:
 
     cursor.execute("""
         SELECT s.*, v.title, v.channel_title, v.thumbnail_url,
+               v.channel_id, v.published_at,
                ss.score as senior_score, ss.highlights
         FROM snapshots s
         JOIN videos v ON s.video_id = v.video_id
@@ -239,6 +303,7 @@ def get_snapshots_by_date_and_source(date: str, data_source: str = 'all') -> Lis
 
     cursor.execute(f"""
         SELECT s.*, v.title, v.channel_title, v.thumbnail_url,
+               v.channel_id, v.published_at,
                ss.score as senior_score, ss.highlights
         FROM snapshots s
         JOIN videos v ON s.video_id = v.video_id
@@ -309,6 +374,21 @@ def upsert_channel(channel_data: Dict[str, Any]) -> None:
 
     conn.commit()
     conn.close()
+
+
+def get_channel_by_id(channel_id: str) -> Optional[Dict[str, Any]]:
+    """채널 정보 조회 (channel_id로)"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT * FROM channels WHERE channel_id = ?
+    """, (channel_id,))
+
+    result = cursor.fetchone()
+    conn.close()
+
+    return dict(result) if result else None
 
 
 def check_snapshot_exists(video_id: str, snapshot_date: str, category_id: str) -> bool:

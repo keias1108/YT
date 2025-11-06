@@ -1,7 +1,7 @@
 // 전역 변수
 let allCategories = [];
-let currentSort = 'senior_score';  // 기본 정렬: SeniorScore
-let currentOrder = 'desc';          // 기본 방향: 내림차순
+let currentSort = 'view_score';  // 기본 정렬: ViewScore
+let currentOrder = 'desc';        // 기본 방향: 내림차순
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,10 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
     loadStats();
     loadCategories();
     initializeSortableHeaders();
+    initializeWeightSliders();
+    loadWeights();  // 저장된 가중치 복원
+    restoreSectionStates();  // 섹션 토글 상태 복원
 
     // 이벤트 리스너 등록
     document.getElementById('btn-collect').addEventListener('click', collectData);
     document.getElementById('btn-load').addEventListener('click', loadVideos);
+    document.getElementById('btn-recalculate').addEventListener('click', recalculateViewScores);
+    document.getElementById('btn-save-weights').addEventListener('click', saveWeights);
 });
 
 /**
@@ -314,6 +319,219 @@ function updateSortArrows() {
         } else {
             header.classList.remove('active');
             arrow.textContent = '';
+        }
+    });
+}
+
+/**
+ * 가중치 슬라이더 초기화
+ */
+function initializeWeightSliders() {
+    const sliders = [
+        { id: 'view-weight', valId: 'view-weight-val' },
+        { id: 'subscriber-weight', valId: 'subscriber-weight-val' },
+        { id: 'recency-weight', valId: 'recency-weight-val' },
+        { id: 'engagement-weight', valId: 'engagement-weight-val' }
+    ];
+
+    sliders.forEach(slider => {
+        const element = document.getElementById(slider.id);
+        const valueDisplay = document.getElementById(slider.valId);
+
+        element.addEventListener('input', (e) => {
+            valueDisplay.textContent = parseFloat(e.target.value).toFixed(1);
+        });
+    });
+}
+
+/**
+ * ViewScore 재계산 (슬라이더 가중치 적용)
+ */
+async function recalculateViewScores() {
+    const viewDate = document.getElementById('view-date').value;
+    const dataSource = document.querySelector('input[name="data-source"]:checked').value;
+    const tableBody = document.getElementById('video-table-body');
+    const countDiv = document.getElementById('video-count');
+
+    // 가중치 가져오기
+    const weights = {
+        view: parseFloat(document.getElementById('view-weight').value),
+        subscriber: parseFloat(document.getElementById('subscriber-weight').value),
+        recency: parseFloat(document.getElementById('recency-weight').value),
+        engagement: parseFloat(document.getElementById('engagement-weight').value)
+    };
+
+    // 로딩 표시
+    tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">재계산 중...</td></tr>';
+
+    try {
+        const response = await fetch('/api/videos/recalculate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                snapshot_date: viewDate,
+                data_source: dataSource,
+                weights: weights
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const videos = result.data;
+
+            if (videos.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">결과가 없습니다.</td></tr>';
+                countDiv.textContent = '';
+                return;
+            }
+
+            // 테이블 렌더링
+            tableBody.innerHTML = videos.map((video, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>
+                        <img src="${video.thumbnail_url}" alt="썸네일" class="thumbnail">
+                    </td>
+                    <td class="video-title">
+                        <a href="https://www.youtube.com/watch?v=${video.video_id}" target="_blank">
+                            ${video.title}
+                        </a>
+                    </td>
+                    <td>${video.channel_title}</td>
+                    <td>${(video.view_count || 0).toLocaleString()}</td>
+                    <td>
+                        <span class="score-badge ${getScoreClass(video.view_score)}">
+                            ${(video.view_score || 0).toFixed(1)}
+                        </span>
+                    </td>
+                    <td class="highlights">
+                        ${renderBreakdown(video.metadata)}
+                    </td>
+                    <td>${(video.delta_views_14d || 0).toLocaleString()}</td>
+                </tr>
+            `).join('');
+
+            countDiv.textContent = `총 ${videos.length}개 비디오 (가중치: 조회수=${weights.view}, 구독자=${weights.subscriber}, 최신성=${weights.recency}, 참여도=${weights.engagement})`;
+        } else {
+            tableBody.innerHTML = `<tr><td colspan="8" class="empty-state">오류: ${result.error}</td></tr>`;
+            countDiv.textContent = '';
+        }
+    } catch (error) {
+        console.error('재계산 실패:', error);
+        tableBody.innerHTML = `<tr><td colspan="8" class="empty-state">재계산 실패: ${error.message}</td></tr>`;
+        countDiv.textContent = '';
+    }
+}
+
+/**
+ * ViewScore Breakdown 렌더링
+ */
+function renderBreakdown(metadata) {
+    if (!metadata) return '-';
+
+    try {
+        const meta = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+
+        const parts = [];
+        parts.push(`<span class="factor-tag">👁️ ${(meta.raw_view_count || 0).toLocaleString()}</span>`);
+        parts.push(`<span class="factor-tag">👥 ${(meta.raw_subscriber_count || 0).toLocaleString()}</span>`);
+
+        if (meta.raw_published_at) {
+            const daysAgo = Math.floor((new Date() - new Date(meta.raw_published_at)) / (1000 * 60 * 60 * 24));
+            parts.push(`<span class="factor-tag">📅 ${daysAgo}일</span>`);
+        }
+
+        parts.push(`<span class="factor-tag">💬 ${(meta.raw_engagement || 0).toLocaleString()}</span>`);
+
+        return parts.join(' ');
+    } catch (e) {
+        return '-';
+    }
+}
+
+/**
+ * 가중치 저장 (localStorage)
+ */
+function saveWeights() {
+    const weights = {
+        view: parseFloat(document.getElementById('view-weight').value),
+        subscriber: parseFloat(document.getElementById('subscriber-weight').value),
+        recency: parseFloat(document.getElementById('recency-weight').value),
+        engagement: parseFloat(document.getElementById('engagement-weight').value)
+    };
+
+    localStorage.setItem('viewScoreWeights', JSON.stringify(weights));
+    alert('가중치가 저장되었습니다!');
+}
+
+/**
+ * 가중치 복원 (localStorage)
+ */
+function loadWeights() {
+    const savedWeights = localStorage.getItem('viewScoreWeights');
+    if (!savedWeights) return;
+
+    try {
+        const weights = JSON.parse(savedWeights);
+
+        document.getElementById('view-weight').value = weights.view;
+        document.getElementById('view-weight-val').textContent = weights.view.toFixed(1);
+
+        document.getElementById('subscriber-weight').value = weights.subscriber;
+        document.getElementById('subscriber-weight-val').textContent = weights.subscriber.toFixed(1);
+
+        document.getElementById('recency-weight').value = weights.recency;
+        document.getElementById('recency-weight-val').textContent = weights.recency.toFixed(1);
+
+        document.getElementById('engagement-weight').value = weights.engagement;
+        document.getElementById('engagement-weight-val').textContent = weights.engagement.toFixed(1);
+    } catch (e) {
+        console.error('가중치 복원 실패:', e);
+    }
+}
+
+/**
+ * 섹션 토글 (접기/펼치기)
+ */
+function toggleSection(sectionClass) {
+    const section = document.querySelector(`.${sectionClass}`);
+    const content = section.querySelector('.form-group, .weight-controls, .checkbox-group').parentElement;
+    const toggleBtn = section.querySelector('.toggle-btn');
+
+    section.classList.toggle('collapsed');
+
+    // 화살표 방향 변경
+    if (section.classList.contains('collapsed')) {
+        toggleBtn.textContent = '▶';
+    } else {
+        toggleBtn.textContent = '▼';
+    }
+
+    // localStorage에 상태 저장
+    const sectionStates = JSON.parse(localStorage.getItem('sectionStates') || '{}');
+    sectionStates[sectionClass] = section.classList.contains('collapsed');
+    localStorage.setItem('sectionStates', JSON.stringify(sectionStates));
+}
+
+/**
+ * 섹션 토글 상태 복원
+ */
+function restoreSectionStates() {
+    const sectionStates = JSON.parse(localStorage.getItem('sectionStates') || '{}');
+
+    Object.keys(sectionStates).forEach(sectionClass => {
+        if (sectionStates[sectionClass]) {
+            const section = document.querySelector(`.${sectionClass}`);
+            if (section) {
+                section.classList.add('collapsed');
+                const toggleBtn = section.querySelector('.toggle-btn');
+                if (toggleBtn) {
+                    toggleBtn.textContent = '▶';
+                }
+            }
         }
     });
 }

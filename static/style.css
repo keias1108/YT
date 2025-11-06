@@ -421,3 +421,131 @@ footer a:hover {
         height: 45px;
     }
 }
+
+/* ViewScore 가중치 조정 패널 */
+.weight-panel {
+    background: white;
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.weight-panel h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 1.1em;
+}
+
+.weight-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.weight-slider {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.weight-slider label {
+    min-width: 250px;
+    font-size: 0.95em;
+    color: #555;
+}
+
+.weight-slider label span {
+    display: inline-block;
+    min-width: 30px;
+    font-weight: 600;
+    color: #667eea;
+}
+
+.weight-slider input[type="range"] {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: #e0e0e0;
+    outline: none;
+    cursor: pointer;
+}
+
+.weight-slider input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.weight-slider input[type="range"]::-webkit-slider-thumb:hover {
+    background: #5568d3;
+    transform: scale(1.2);
+}
+
+.weight-slider input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.weight-slider input[type="range"]::-moz-range-thumb:hover {
+    background: #5568d3;
+    transform: scale(1.2);
+}
+
+.weight-controls button {
+    margin-top: 10px;
+    align-self: flex-start;
+}
+
+/* Breakdown 태그 */
+.factor-tag {
+    display: inline-block;
+    padding: 4px 8px;
+    margin: 2px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: #555;
+}
+
+/* 토글 버튼 */
+.toggle-btn {
+    float: right;
+    background: none;
+    border: none;
+    font-size: 1em;
+    cursor: pointer;
+    color: #667eea;
+    padding: 0 10px;
+    transition: transform 0.3s;
+}
+
+.toggle-btn:hover {
+    color: #5568d3;
+}
+
+/* 접기/펼치기 애니메이션 */
+section.collect-panel,
+section.weight-panel {
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+section.collect-panel.collapsed > *:not(h2),
+section.weight-panel.collapsed > *:not(h3) {
+    display: none;
+}
+
+section.collapsed {
+    padding-bottom: 10px;
+}

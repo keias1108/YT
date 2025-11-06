@@ -35,7 +35,10 @@
 
         <!-- 데이터 수집 패널 -->
         <section class="collect-panel">
-            <h2>📊 데이터 수집</h2>
+            <h2>
+                📊 데이터 수집
+                <button class="toggle-btn" onclick="toggleSection('collect-panel')">▼</button>
+            </h2>
             <div class="form-group">
                 <label>카테고리 선택 (복수 선택 가능):</label>
                 <div id="categories-list" class="checkbox-group">
@@ -87,6 +90,36 @@
             <div id="video-count" class="info-text"></div>
         </section>
 
+        <!-- ViewScore 가중치 조정 패널 -->
+        <section class="weight-panel">
+            <h3>
+                ⚙️ ViewScore 가중치 조정 (파인튜닝)
+                <button class="toggle-btn" onclick="toggleSection('weight-panel')">▼</button>
+            </h3>
+            <div class="weight-controls">
+                <div class="weight-slider">
+                    <label>👁️ 조회수: <span id="view-weight-val">1.0</span></label>
+                    <input type="range" id="view-weight" min="0" max="5" step="0.1" value="1.0">
+                </div>
+                <div class="weight-slider">
+                    <label>👥 구독자 (언더독 보너스): <span id="subscriber-weight-val">1.0</span></label>
+                    <input type="range" id="subscriber-weight" min="0" max="5" step="0.1" value="1.0">
+                </div>
+                <div class="weight-slider">
+                    <label>📅 최신성: <span id="recency-weight-val">1.0</span></label>
+                    <input type="range" id="recency-weight" min="0" max="5" step="0.1" value="1.0">
+                </div>
+                <div class="weight-slider">
+                    <label>💬 참여도 (좋아요+댓글): <span id="engagement-weight-val">1.0</span></label>
+                    <input type="range" id="engagement-weight" min="0" max="5" step="0.1" value="1.0">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-recalculate" class="btn-secondary">재계산</button>
+                    <button id="btn-save-weights" class="btn-secondary">저장</button>
+                </div>
+            </div>
+        </section>
+
         <!-- 비디오 테이블 -->
         <section class="video-table-container">
             <table id="video-table">
@@ -99,10 +132,10 @@
                         <th class="sortable" data-sort="view_count">
                             조회수 <span class="sort-arrow"></span>
                         </th>
-                        <th class="sortable active" data-sort="senior_score">
-                            SeniorScore <span class="sort-arrow">▼</span>
+                        <th class="sortable active" data-sort="view_score">
+                            ViewScore <span class="sort-arrow">▼</span>
                         </th>
-                        <th>근거 (Highlights)</th>
+                        <th>Breakdown</th>
                         <th class="sortable" data-sort="delta_views_14d">
                             Δviews (14일) <span class="sort-arrow"></span>
                         </th>
