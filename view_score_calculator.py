@@ -3,7 +3,7 @@ ViewScore 계산기
 
 영상의 조회수 잠재력을 평가하는 점수 시스템
 - 조회수: 높을수록 좋음
-- 구독자수: 낮을수록 좋음 (언더독 보너스)
+- 구독자수: 조회수 대비 구독자가 적을수록 좋음 (언더독 보너스)
 - 최신성: 최근일수록 좋음
 - 참여도: 좋아요+댓글 많을수록 좋음
 """
@@ -38,27 +38,53 @@ def normalize_view_count(view_count: int) -> float:
     return min(100.0, max(0.0, score))
 
 
-def normalize_subscriber_count_inverse(subscriber_count: int) -> float:
+def normalize_subscriber_count_inverse(subscriber_count: int, view_count: int = 0) -> float:
     """
     구독자수 역정규화 (0-100점)
-    구독자가 적을수록 높은 점수 (언더독 보너스)
+    조회수 대비 구독자수 비율로 언더독 보너스 계산
+    - 높은 조회수 대비 낮은 구독자수 = 높은 점수 (진정한 언더독)
     """
     if subscriber_count is None or subscriber_count <= 0:
         return 100.0  # 구독자 정보 없으면 최대 보너스
 
-    # 구간별 점수
-    if subscriber_count < 1000:
-        return 100.0  # 1천 미만: 최대 보너스
-    elif subscriber_count < 10000:
-        return 90.0   # 1만 미만: 매우 높음
-    elif subscriber_count < 100000:
-        return 70.0   # 10만 미만: 높음
-    elif subscriber_count < 1000000:
-        return 40.0   # 100만 미만: 중간
-    elif subscriber_count < 10000000:
-        return 20.0   # 1000만 미만: 낮음
+    if view_count <= 0:
+        return 50.0  # 조회수 없으면 중간 점수
+
+    # 조회수/구독자 비율 계산
+    ratio = view_count / subscriber_count
+
+    # 비율 기반 점수
+    # ratio >= 100 (조회수가 구독자의 100배) = 100점
+    # ratio >= 50 = 90점
+    # ratio >= 20 = 80점
+    # ratio >= 10 = 70점
+    # ratio >= 5 = 60점
+    # ratio >= 2 = 50점
+    # ratio >= 1 = 40점
+    # ratio >= 0.5 = 30점
+    # ratio >= 0.1 = 20점
+    # ratio < 0.1 = 10점
+
+    if ratio >= 100:
+        return 100.0
+    elif ratio >= 50:
+        return 90.0
+    elif ratio >= 20:
+        return 80.0
+    elif ratio >= 10:
+        return 70.0
+    elif ratio >= 5:
+        return 60.0
+    elif ratio >= 2:
+        return 50.0
+    elif ratio >= 1:
+        return 40.0
+    elif ratio >= 0.5:
+        return 30.0
+    elif ratio >= 0.1:
+        return 20.0
     else:
-        return 10.0   # 1000만 이상: 매우 낮음
+        return 10.0
 
 
 def normalize_recency(published_at: str) -> float:
@@ -140,10 +166,11 @@ def calculate_view_score(
         weights = DEFAULT_WEIGHTS.copy()
 
     # 각 요소 점수 계산 (0-100점)
-    view_score = normalize_view_count(snapshot_data.get('view_count', 0))
+    view_count = snapshot_data.get('view_count', 0)
+    view_score = normalize_view_count(view_count)
 
     subscriber_count = channel_data.get('subscriber_count', 0) if channel_data else 0
-    subscriber_score = normalize_subscriber_count_inverse(subscriber_count)
+    subscriber_score = normalize_subscriber_count_inverse(subscriber_count, view_count)
 
     recency_score = normalize_recency(video_data.get('published_at', ''))
 
