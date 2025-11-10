@@ -68,6 +68,12 @@ function isSearchPage() {
 let registeredChannelNames = new Set();
 let channelNamesLoaded = false;
 
+// 인기 영상 표시 설정
+let trendingSettings = {
+    days: 14,
+    minViews: 100000
+};
+
 // 등록된 채널명 로드
 function loadRegisteredChannels() {
     if (channelNamesLoaded) return Promise.resolve();
@@ -88,6 +94,69 @@ function loadRegisteredChannels() {
             }
         );
     });
+}
+
+// 인기 영상 설정 로드
+function loadTrendingSettings() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['trendingSettings'], (result) => {
+            if (result.trendingSettings) {
+                trendingSettings = result.trendingSettings;
+                console.log('[인기 영상] 설정 로드:', trendingSettings);
+            }
+            resolve();
+        });
+    });
+}
+
+// 조회수 파싱 함수
+// "조회수 3.2만회" → 32000, "조회수 1백만회" → 1000000
+function parseViewCount(viewText) {
+    if (!viewText) return 0;
+
+    // "조회수" 제거 및 정리
+    const cleanText = viewText.replace(/조회수|회|,/g, '').trim();
+
+    // 만, 천, 백만 처리
+    if (cleanText.includes('백만') || cleanText.includes('million')) {
+        const num = parseFloat(cleanText);
+        return num * 1000000;
+    } else if (cleanText.includes('만')) {
+        const num = parseFloat(cleanText);
+        return num * 10000;
+    } else if (cleanText.includes('천') || cleanText.includes('k') || cleanText.includes('K')) {
+        const num = parseFloat(cleanText);
+        return num * 1000;
+    } else {
+        // 숫자만 있는 경우
+        return parseInt(cleanText) || 0;
+    }
+}
+
+// 업로드 시간 파싱 함수
+// "4일 전" → 4, "2주 전" → 14, "3개월 전" → 90
+function parseUploadTime(timeText) {
+    if (!timeText) return 999; // 파싱 실패 시 큰 값 반환 (조건 미달)
+
+    const cleanText = timeText.replace(/전|ago/g, '').trim();
+
+    if (cleanText.includes('분') || cleanText.includes('시간') ||
+        cleanText.includes('minute') || cleanText.includes('hour')) {
+        return 0; // 오늘
+    } else if (cleanText.includes('일') || cleanText.includes('day')) {
+        const num = parseInt(cleanText);
+        return num || 0;
+    } else if (cleanText.includes('주') || cleanText.includes('week')) {
+        const num = parseInt(cleanText);
+        return (num || 0) * 7;
+    } else if (cleanText.includes('개월') || cleanText.includes('달') || cleanText.includes('month')) {
+        const num = parseInt(cleanText);
+        return (num || 0) * 30;
+    } else if (cleanText.includes('년') || cleanText.includes('year')) {
+        return 999; // 1년 이상은 항상 조건 미달
+    }
+
+    return 999; // 파싱 실패
 }
 
 // 검색 결과의 비디오 항목에 마크 추가
@@ -198,7 +267,8 @@ function markRelatedVideos() {
     const lockups = document.querySelectorAll('#related yt-lockup-view-model');
     console.log('[시니어 채널] 관련 영상 수:', lockups.length);
 
-    let markedCount = 0;
+    let seniorMarkedCount = 0;
+    let trendingMarkedCount = 0;
 
     lockups.forEach((lockup, index) => {
         // 이미 처리된 항목은 스킵
@@ -207,16 +277,22 @@ function markRelatedVideos() {
 
         // 채널명 추출 (.yt-core-attributed-string의 두 번째 요소)
         const textElements = lockup.querySelectorAll('.yt-core-attributed-string');
-        if (textElements.length < 2) {
-            console.warn('[시니어 채널] 채널명을 찾을 수 없음:', index);
+        if (textElements.length < 4) {
+            console.warn('[시니어 채널] 텍스트 요소를 찾을 수 없음:', index);
             return;
         }
 
         const channelName = textElements[1].textContent.trim().toLowerCase();
+        const viewText = textElements[2].textContent.trim();
+        const timeText = textElements[3].textContent.trim();
 
         // 첫 3개만 로그 (디버깅)
         if (index < 3) {
-            console.log(`[시니어 채널] 관련 영상 ${index}: "${channelName}"`);
+            console.log(`[시니어 채널] 관련 영상 ${index}:`, {
+                채널: channelName,
+                조회수: viewText,
+                시간: timeText
+            });
         }
 
         // 등록된 채널인지 확인
@@ -224,22 +300,51 @@ function markRelatedVideos() {
             const channelNameRow = textElements[1].parentElement;
 
             // 이미 마크가 있으면 스킵
-            if (channelNameRow.querySelector('.senior-channel-mark')) return;
+            if (!channelNameRow.querySelector('.senior-channel-mark')) {
+                // 체크 마크 추가
+                const mark = document.createElement('span');
+                mark.className = 'senior-channel-mark';
+                mark.innerHTML = '✅';
+                mark.title = '시니어 채널로 등록됨';
+                mark.style.marginLeft = '6px';
 
-            // 체크 마크 추가
-            const mark = document.createElement('span');
-            mark.className = 'senior-channel-mark';
-            mark.innerHTML = '✅';
-            mark.title = '시니어 채널로 등록됨';
-            mark.style.marginLeft = '6px';
+                channelNameRow.appendChild(mark);
+                seniorMarkedCount++;
+            }
+        }
 
-            channelNameRow.appendChild(mark);
-            markedCount++;
-            console.log('[시니어 채널] 관련 영상 마크 추가:', channelName);
+        // 인기 영상 체크 (조회수 & 날짜 조건)
+        const viewCount = parseViewCount(viewText);
+        const daysAgo = parseUploadTime(timeText);
+
+        if (viewCount >= trendingSettings.minViews && daysAgo <= trendingSettings.days) {
+            // 조회수/시간 텍스트가 있는 행에 뱃지 추가
+            const viewRow = textElements[2].parentElement;
+
+            // 이미 인기 뱃지가 있으면 스킵
+            if (!viewRow.querySelector('.trending-video-badge')) {
+                const badge = document.createElement('span');
+                badge.className = 'trending-video-badge';
+                badge.innerHTML = '🔥';
+                badge.title = `인기 영상: ${viewText} • ${timeText}`;
+                badge.style.marginLeft = '6px';
+
+                viewRow.appendChild(badge);
+                trendingMarkedCount++;
+
+                if (index < 3) {
+                    console.log('[인기 영상] 뱃지 추가:', {
+                        조회수: viewCount,
+                        일수: daysAgo,
+                        기준: trendingSettings
+                    });
+                }
+            }
         }
     });
 
-    console.log(`[시니어 채널] 총 ${markedCount}개 관련 영상에 마크 추가됨`);
+    console.log(`[시니어 채널] 총 ${seniorMarkedCount}개 관련 영상에 마크 추가됨`);
+    console.log(`[인기 영상] 총 ${trendingMarkedCount}개 관련 영상에 뱃지 추가됨`);
 }
 
 // 관련 영상 무한 스크롤 감지 (MutationObserver)
@@ -289,6 +394,9 @@ async function initWatchPage() {
 
     // 채널명 로드
     await loadRegisteredChannels();
+
+    // 인기 영상 설정 로드
+    await loadTrendingSettings();
 
     // 현재 관련 영상에 마크 추가
     markRelatedVideos();
@@ -703,6 +811,32 @@ function init() {
         }
     }, 1000);
 }
+
+// 메시지 리스너 (popup에서 설정 변경 시)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'updateTrendingSettings') {
+        console.log('[인기 영상] 설정 업데이트:', message.settings);
+        trendingSettings = message.settings;
+
+        // Watch 페이지에서만 재마킹
+        if (isWatchPage()) {
+            // 기존 인기 뱃지 제거
+            document.querySelectorAll('.trending-video-badge').forEach(badge => {
+                badge.remove();
+            });
+
+            // 체크 상태 초기화
+            document.querySelectorAll('#related yt-lockup-view-model').forEach(lockup => {
+                lockup.dataset.seniorChecked = 'false';
+            });
+
+            // 재마킹
+            markRelatedVideos();
+        }
+
+        sendResponse({ success: true });
+    }
+});
 
 // 초기 실행
 console.log('[시니어 채널] 확장 프로그램 시작');

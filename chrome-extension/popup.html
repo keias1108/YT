@@ -74,6 +74,47 @@
             border-radius: 3px;
             font-size: 12px;
         }
+
+        .settings {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .settings h2 {
+            font-size: 14px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .setting-row label {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .select {
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: none;
+            background: white;
+            color: #667eea;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            min-width: 120px;
+        }
+
+        .btn-save {
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -95,6 +136,33 @@
     <button id="btn-open-channels" class="btn">
         📋 채널 관리
     </button>
+
+    <div class="settings">
+        <h2>🔥 인기 영상 표시 설정</h2>
+        <div class="setting-row">
+            <label for="period-select">기간:</label>
+            <select id="period-select" class="select">
+                <option value="7">최근 1주</option>
+                <option value="14" selected>최근 2주</option>
+                <option value="21">최근 3주</option>
+                <option value="28">최근 4주</option>
+                <option value="90">최근 3개월</option>
+            </select>
+        </div>
+        <div class="setting-row">
+            <label for="views-select">최소 조회수:</label>
+            <select id="views-select" class="select">
+                <option value="10000">1만</option>
+                <option value="50000">5만</option>
+                <option value="100000" selected>10만</option>
+                <option value="500000">50만</option>
+                <option value="1000000">100만</option>
+            </select>
+        </div>
+        <button id="btn-save-settings" class="btn btn-save">
+            💾 설정 저장
+        </button>
+    </div>
 
     <div id="status"></div>
 
