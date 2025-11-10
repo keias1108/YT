@@ -304,10 +304,11 @@ def get_snapshots_by_date_and_source(date: str, data_source: str = 'all') -> Lis
     cursor.execute(f"""
         SELECT s.*, v.title, v.channel_title, v.thumbnail_url,
                v.channel_id, v.published_at,
-               ss.score as senior_score, ss.highlights
+               vs.score as view_score, vs.view_score as view_component,
+               vs.subscriber_score, vs.recency_score, vs.engagement_score
         FROM snapshots s
         JOIN videos v ON s.video_id = v.video_id
-        LEFT JOIN senior_scores ss ON s.id = ss.snapshot_id
+        LEFT JOIN view_scores vs ON s.id = vs.snapshot_id
         WHERE {where_clause}
         ORDER BY s.rank_position
     """, (date,))

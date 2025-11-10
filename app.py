@@ -108,73 +108,22 @@ def collect_data():
         }), 500
 
 
-@app.route('/api/videos', methods=['GET'])
+@app.route('/api/videos', methods=['POST'])
 def get_videos():
     """
-    수집된 비디오 조회 (DB에서 읽기, API 호출 X)
-
-    Query Parameters:
-        - snapshot_date: 날짜 (YYYY-MM-DD, 기본값: 오늘)
-        - senior_threshold: SeniorScore 최소값 (기본값: 0)
-        - limit: 최대 반환 수 (기본값: 100)
-        - sort_by: 정렬 기준 (기본값: senior_score)
-                  허용값: view_count, senior_score, delta_views_14d
-        - order: 정렬 방향 (기본값: desc)
-                허용값: asc, desc
-        - data_source: 데이터 소스 (기본값: channel)
-                      허용값: channel, category, all
-
-    Returns:
-        JSON: 비디오 리스트
-    """
-    try:
-        snapshot_date = request.args.get('snapshot_date')
-        senior_threshold = float(request.args.get('senior_threshold', 0))
-        limit = int(request.args.get('limit', 100))
-        sort_by = request.args.get('sort_by', 'senior_score')
-        order = request.args.get('order', 'desc')
-        data_source = request.args.get('data_source', 'channel')
-
-        if snapshot_date is None:
-            snapshot_date = datetime.now().strftime('%Y-%m-%d')
-
-        # DB에서 조회 (API 호출 없음)
-        videos = data_collector.get_ranked_senior_videos(
-            snapshot_date=snapshot_date,
-            senior_threshold=senior_threshold,
-            limit=limit,
-            sort_by=sort_by,
-            order=order,
-            data_source=data_source
-        )
-
-        return jsonify({
-            'success': True,
-            'data': videos,
-            'count': len(videos),
-            'snapshot_date': snapshot_date
-        })
-
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-@app.route('/api/videos/recalculate', methods=['POST'])
-def recalculate_view_scores():
-    """
-    ViewScore 실시간 재계산 (슬라이더 조정용)
+    ViewScore 기반 비디오 조회 (실시간 재계산)
 
     Request Body:
     {
         "snapshot_date": "2025-11-06",
         "data_source": "channel",
+        "sort_by": "view_score",
+        "order": "desc",
+        "limit": 100,
         "weights": {
-            "view": 1.5,
-            "subscriber": 0.8,
-            "recency": 1.2,
+            "view": 1.0,
+            "subscriber": 1.0,
+            "recency": 1.0,
             "engagement": 1.0
         }
     }
@@ -183,6 +132,9 @@ def recalculate_view_scores():
         data = request.get_json()
         snapshot_date = data.get('snapshot_date')
         data_source = data.get('data_source', 'channel')
+        sort_by = data.get('sort_by', 'view_score')
+        order = data.get('order', 'desc')
+        limit = int(data.get('limit', 100))
         weights = data.get('weights', view_score_calculator.DEFAULT_WEIGHTS)
 
         if not snapshot_date:
@@ -221,18 +173,33 @@ def recalculate_view_scores():
                     'engagement': score_result['engagement_score']
                 }
                 snapshot['metadata'] = score_result['metadata']
+
+                # Δviews 계산 추가
+                delta_views = database.get_delta_views(snapshot['video_id'], days=14)
+                snapshot['delta_views_14d'] = delta_views if delta_views else 0
+
                 results.append(snapshot)
             except Exception as e:
                 print(f"⚠️  ViewScore 계산 실패: {e}")
                 continue
 
-        # 정렬 (ViewScore 내림차순)
-        results.sort(key=lambda x: x.get('view_score', 0), reverse=True)
+        # 동적 정렬
+        allowed_sort_columns = {
+            'view_count': 'view_count',
+            'view_score': 'view_score',
+            'delta_views_14d': 'delta_views_14d'
+        }
+
+        sort_key = allowed_sort_columns.get(sort_by, 'view_score')
+        reverse_order = (order.lower() == 'desc')
+
+        results.sort(key=lambda x: (x.get(sort_key) or 0), reverse=reverse_order)
 
         return jsonify({
             'success': True,
-            'data': results[:100],  # 상위 100개만
+            'data': results[:limit],
             'count': len(results),
+            'snapshot_date': snapshot_date,
             'weights_used': weights
         })
 
@@ -241,6 +208,8 @@ def recalculate_view_scores():
             'success': False,
             'error': str(e)
         }), 500
+
+
 
 
 @app.route('/api/video/<video_id>', methods=['GET'])
@@ -255,18 +224,21 @@ def get_video_details(video_id):
         conn = database.get_connection()
         cursor = conn.cursor()
 
-        # 비디오 기본 정보 + 최신 스냅샷 + SeniorScore
+        # 비디오 기본 정보 + 최신 스냅샷 + ViewScore
         cursor.execute("""
             SELECT
                 v.*,
                 s.view_count, s.like_count, s.comment_count,
                 s.snapshot_date, s.rank_position,
-                ss.score as senior_score,
-                ss.keyword_score, ss.genre_score, ss.comment_score,
-                ss.channel_score, ss.length_score, ss.highlights
+                vs.score as view_score,
+                vs.view_score as view_component, vs.subscriber_score,
+                vs.recency_score, vs.engagement_score,
+                vs.view_weight, vs.subscriber_weight,
+                vs.recency_weight, vs.engagement_weight,
+                vs.metadata
             FROM videos v
             LEFT JOIN snapshots s ON v.video_id = s.video_id
-            LEFT JOIN senior_scores ss ON s.id = ss.snapshot_id
+            LEFT JOIN view_scores vs ON s.id = vs.snapshot_id
             WHERE v.video_id = ?
             ORDER BY s.snapshot_date DESC
             LIMIT 1
@@ -283,9 +255,9 @@ def get_video_details(video_id):
 
         video = dict(row)
 
-        # highlights JSON 파싱
-        if video.get('highlights'):
-            video['highlights'] = json.loads(video['highlights'])
+        # metadata JSON 파싱 (ViewScore)
+        if video.get('metadata'):
+            video['metadata'] = json.loads(video['metadata'])
 
         # tags JSON 파싱
         if video.get('tags'):
@@ -377,13 +349,13 @@ def get_unlabeled_videos():
         cursor.execute("""
             SELECT DISTINCT
                 v.video_id, v.title, v.channel_title, v.thumbnail_url,
-                ss.score as senior_score, ss.highlights
+                vs.score as view_score, vs.metadata
             FROM videos v
             JOIN snapshots s ON v.video_id = s.video_id
-            JOIN senior_scores ss ON s.id = ss.snapshot_id
+            JOIN view_scores vs ON s.id = vs.snapshot_id
             LEFT JOIN labels l ON v.video_id = l.video_id
             WHERE l.id IS NULL
-            ORDER BY ss.score DESC
+            ORDER BY vs.score DESC
             LIMIT ?
         """, (limit,))
 
@@ -393,8 +365,8 @@ def get_unlabeled_videos():
         videos = []
         for row in rows:
             video = dict(row)
-            if video.get('highlights'):
-                video['highlights'] = json.loads(video['highlights'])
+            if video.get('metadata'):
+                video['metadata'] = json.loads(video['metadata'])
             videos.append(video)
 
         return jsonify({

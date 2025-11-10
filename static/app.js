@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 이벤트 리스너 등록
     document.getElementById('btn-collect').addEventListener('click', collectData);
-    document.getElementById('btn-load').addEventListener('click', loadVideos);
     document.getElementById('btn-recalculate').addEventListener('click', recalculateViewScores);
     document.getElementById('btn-save-weights').addEventListener('click', saveWeights);
 });
@@ -141,69 +140,6 @@ async function collectData() {
     }
 }
 
-/**
- * 비디오 조회 (DB에서, API 호출 없음)
- */
-async function loadVideos() {
-    const viewDate = document.getElementById('view-date').value;
-    const seniorThreshold = parseFloat(document.getElementById('senior-threshold').value);
-    const dataSource = document.querySelector('input[name="data-source"]:checked').value;
-    const tableBody = document.getElementById('video-table-body');
-    const countDiv = document.getElementById('video-count');
-
-    // 로딩 표시
-    tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">로딩 중...</td></tr>';
-
-    try {
-        const response = await fetch(`/api/videos?snapshot_date=${viewDate}&senior_threshold=${seniorThreshold}&limit=100&sort_by=${currentSort}&order=${currentOrder}&data_source=${dataSource}`);
-        const result = await response.json();
-
-        if (result.success) {
-            const videos = result.data;
-
-            if (videos.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">조회 결과가 없습니다. 먼저 데이터를 수집하세요.</td></tr>';
-                countDiv.textContent = '';
-                return;
-            }
-
-            // 테이블 렌더링
-            tableBody.innerHTML = videos.map((video, index) => `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td>
-                        <img src="${video.thumbnail_url}" alt="썸네일" class="thumbnail">
-                    </td>
-                    <td class="video-title">
-                        <a href="https://www.youtube.com/watch?v=${video.video_id}" target="_blank">
-                            ${video.title}
-                        </a>
-                    </td>
-                    <td>${video.channel_title}</td>
-                    <td>${(video.view_count || 0).toLocaleString()}</td>
-                    <td>
-                        <span class="score-badge ${getScoreClass(video.senior_score)}">
-                            ${(video.senior_score || 0).toFixed(1)}
-                        </span>
-                    </td>
-                    <td class="highlights">
-                        ${renderHighlights(video.highlights)}
-                    </td>
-                    <td>${(video.delta_views_14d || 0).toLocaleString()}</td>
-                </tr>
-            `).join('');
-
-            countDiv.textContent = `총 ${videos.length}개 비디오 (날짜: ${result.snapshot_date})`;
-        } else {
-            tableBody.innerHTML = `<tr><td colspan="8" class="empty-state">오류: ${result.error}</td></tr>`;
-            countDiv.textContent = '';
-        }
-    } catch (error) {
-        console.error('비디오 조회 실패:', error);
-        tableBody.innerHTML = `<tr><td colspan="8" class="empty-state">조회 실패: ${error.message}</td></tr>`;
-        countDiv.textContent = '';
-    }
-}
 
 /**
  * SeniorScore 클래스 반환
@@ -299,8 +235,8 @@ function handleSortClick(header) {
     // 화살표 업데이트
     updateSortArrows();
 
-    // 데이터 다시 로드
-    loadVideos();
+    // 데이터 다시 로드 (재계산 함수 호출)
+    recalculateViewScores();
 }
 
 /**
@@ -362,10 +298,10 @@ async function recalculateViewScores() {
     };
 
     // 로딩 표시
-    tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">재계산 중...</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">조회 중...</td></tr>';
 
     try {
-        const response = await fetch('/api/videos/recalculate', {
+        const response = await fetch('/api/videos', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -373,6 +309,9 @@ async function recalculateViewScores() {
             body: JSON.stringify({
                 snapshot_date: viewDate,
                 data_source: dataSource,
+                sort_by: currentSort,
+                order: currentOrder,
+                limit: 100,
                 weights: weights
             })
         });
@@ -420,8 +359,8 @@ async function recalculateViewScores() {
             countDiv.textContent = '';
         }
     } catch (error) {
-        console.error('재계산 실패:', error);
-        tableBody.innerHTML = `<tr><td colspan="8" class="empty-state">재계산 실패: ${error.message}</td></tr>`;
+        console.error('조회 실패:', error);
+        tableBody.innerHTML = `<tr><td colspan="8" class="empty-state">조회 실패: ${error.message}</td></tr>`;
         countDiv.textContent = '';
     }
 }

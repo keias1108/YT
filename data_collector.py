@@ -159,59 +159,6 @@ def calculate_delta_views_for_date(snapshot_date: str, days: int = 14, data_sour
     return results
 
 
-def get_ranked_senior_videos(
-    snapshot_date: str = None,
-    senior_threshold: float = 5.0,
-    min_delta_views: int = 0,
-    limit: int = 50,
-    sort_by: str = 'senior_score',
-    order: str = 'desc',
-    data_source: str = 'channel'
-) -> List[Dict[str, Any]]:
-    """
-    시니어 친화 영상 랭킹 가져오기
-
-    Args:
-        snapshot_date: 날짜 (None이면 오늘)
-        senior_threshold: SeniorScore 임계값
-        min_delta_views: 최소 Δviews (0이면 필터링 안함)
-        limit: 최대 반환 수
-        sort_by: 정렬 기준 (view_count, senior_score, delta_views_14d)
-        order: 정렬 방향 (asc, desc)
-        data_source: 데이터 소스 ('channel', 'category', 'all')
-
-    Returns:
-        랭킹 리스트
-    """
-    if snapshot_date is None:
-        snapshot_date = datetime.now().strftime('%Y-%m-%d')
-
-    # Δviews 계산 (데이터 소스 필터링 적용)
-    videos = calculate_delta_views_for_date(snapshot_date, data_source=data_source)
-
-    # 필터링
-    filtered = []
-    for video in videos:
-        senior_score = video.get('senior_score', 0)
-        delta_views = video.get('delta_views_14d', 0)
-
-        if senior_score >= senior_threshold and delta_views >= min_delta_views:
-            filtered.append(video)
-
-    # 동적 정렬
-    # SQL Injection 방지: 허용된 컬럼만 사용
-    allowed_sort_columns = {
-        'view_count': 'view_count',
-        'senior_score': 'senior_score',
-        'delta_views_14d': 'delta_views_14d'
-    }
-
-    sort_key = allowed_sort_columns.get(sort_by, 'senior_score')
-    reverse_order = (order.lower() == 'desc')
-
-    filtered.sort(key=lambda x: x.get(sort_key, 0), reverse=reverse_order)
-
-    return filtered[:limit]
 
 
 def load_snapshot_from_file(snapshot_date: str) -> List[Dict[str, Any]]:
