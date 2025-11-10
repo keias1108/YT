@@ -27,7 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
  * 날짜 입력 초기화 (오늘 날짜로)
  */
 function initializeDateInputs() {
-    const today = new Date().toISOString().split('T')[0];
+    // 브라우저 로컬 시간대의 날짜 사용 (YYYY-MM-DD 형식)
+    const today = new Date().toLocaleDateString('sv-SE');
     document.getElementById('view-date').value = today;
 }
 

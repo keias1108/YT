@@ -3,8 +3,11 @@ Flask 웹 애플리케이션
 시니어층 유튜브 트렌드 추적 시스템
 """
 from flask import Flask, render_template, request, jsonify
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import json
+
+# KST (한국 표준시) = UTC+9
+KST = timezone(timedelta(hours=9))
 
 import database
 import youtube_api
@@ -140,7 +143,7 @@ def get_videos():
         weights = data.get('weights', view_score_calculator.DEFAULT_WEIGHTS)
 
         if not snapshot_date:
-            snapshot_date = datetime.now().strftime('%Y-%m-%d')
+            snapshot_date = datetime.now(KST).strftime('%Y-%m-%d')
 
         # 스냅샷 + 채널 정보 조회 (카테고리 필터 포함)
         snapshots = database.get_snapshots_by_date_and_source(snapshot_date, data_source, category_ids)

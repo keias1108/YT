@@ -8,7 +8,7 @@ ViewScore 계산기
 - 참여도: 좋아요+댓글 많을수록 좋음
 """
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 
@@ -99,8 +99,8 @@ def normalize_recency(published_at: str) -> float:
         else:
             published_date = datetime.strptime(published_at, '%Y-%m-%d')
 
-        # 며칠 전인지 계산
-        days_old = (datetime.now(published_date.tzinfo or None) - published_date).days
+        # 며칠 전인지 계산 (UTC 기준으로 통일)
+        days_old = (datetime.now(timezone.utc) - published_date).days
 
         # 지수 감쇠: 30일 반감기
         # score = 100 * exp(-days_old / 30)

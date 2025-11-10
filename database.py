@@ -3,8 +3,11 @@
 """
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
+
+# KST (한국 표준시) = UTC+9
+KST = timezone(timedelta(hours=9))
 
 DATABASE_PATH = 'youtube_senior_trends.db'
 
@@ -383,7 +386,7 @@ def check_channel_collected_today(channel_id: str) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
 
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = datetime.now(KST).strftime('%Y-%m-%d')
 
     cursor.execute("""
         SELECT last_collected_date FROM channels
@@ -403,7 +406,7 @@ def update_channel_collected_date(channel_id: str) -> None:
     conn = get_connection()
     cursor = conn.cursor()
 
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = datetime.now(KST).strftime('%Y-%m-%d')
 
     cursor.execute("""
         UPDATE channels

@@ -3,8 +3,11 @@
 """
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any
+
+# KST (한국 표준시) = UTC+9
+KST = timezone(timedelta(hours=9))
 
 import youtube_api
 import database
@@ -28,7 +31,7 @@ def collect_trending_videos(
         수집 결과 통계
     """
     if snapshot_date is None:
-        snapshot_date = datetime.now().strftime('%Y-%m-%d')
+        snapshot_date = datetime.now(KST).strftime('%Y-%m-%d')
 
     # 결과 통계
     stats = {
@@ -204,7 +207,7 @@ def collect_from_channels(
         수집 결과 통계
     """
     if snapshot_date is None:
-        snapshot_date = datetime.now().strftime('%Y-%m-%d')
+        snapshot_date = datetime.now(KST).strftime('%Y-%m-%d')
 
     # 결과 통계
     stats = {
