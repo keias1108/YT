@@ -9,7 +9,13 @@
       "Bash(tree:*)",
       "Bash(sqlite3:*)",
       "Bash(python3:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(. venv/bin/activate)",
+      "Bash(python app.py:*)",
+      "Bash(/usr/bin/python3:*)",
+      "Bash(venv/Scripts/python.exe:*)",
+      "Bash(venv/bin/python:*)",
+      "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe:*)"
     ],
     "deny": [],
     "ask": []

@@ -8,7 +8,6 @@ from typing import List, Dict, Any
 
 import youtube_api
 import database
-import senior_classifier
 import view_score_calculator
 
 

@@ -12,11 +12,15 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeWeightSliders();
     loadWeights();  // 저장된 가중치 복원
     restoreSectionStates();  // 섹션 토글 상태 복원
+    loadAvailableCategories();  // 오늘 날짜 기준으로 카테고리 자동 로드
 
     // 이벤트 리스너 등록
     document.getElementById('btn-collect').addEventListener('click', collectData);
     document.getElementById('btn-recalculate').addEventListener('click', recalculateViewScores);
     document.getElementById('btn-save-weights').addEventListener('click', saveWeights);
+    document.getElementById('view-date').addEventListener('change', loadAvailableCategories);
+    document.getElementById('btn-select-all-filters').addEventListener('click', selectAllFilters);
+    document.getElementById('btn-deselect-all-filters').addEventListener('click', deselectAllFilters);
 });
 
 /**
@@ -289,6 +293,12 @@ async function recalculateViewScores() {
     const tableBody = document.getElementById('video-table-body');
     const countDiv = document.getElementById('video-count');
 
+    // 카테고리 필터가 비어있으면 먼저 로드
+    const categoryFilters = document.querySelectorAll('.category-filter-checkbox');
+    if (categoryFilters.length === 0) {
+        await loadAvailableCategories();
+    }
+
     // 가중치 가져오기
     const weights = {
         view: parseFloat(document.getElementById('view-weight').value),
@@ -297,23 +307,34 @@ async function recalculateViewScores() {
         engagement: parseFloat(document.getElementById('engagement-weight').value)
     };
 
+    // 선택된 카테고리 필터 가져오기
+    const checkedFilters = document.querySelectorAll('.category-filter-checkbox:checked');
+    const categoryIds = Array.from(checkedFilters).map(cb => cb.value);
+
     // 로딩 표시
     tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">조회 중...</td></tr>';
 
     try {
+        const requestBody = {
+            snapshot_date: viewDate,
+            data_source: dataSource,
+            sort_by: currentSort,
+            order: currentOrder,
+            limit: 100,
+            weights: weights
+        };
+
+        // 카테고리 필터가 있으면 추가
+        if (categoryIds.length > 0) {
+            requestBody.category_ids = categoryIds;
+        }
+
         const response = await fetch('/api/videos', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                snapshot_date: viewDate,
-                data_source: dataSource,
-                sort_by: currentSort,
-                order: currentOrder,
-                limit: 100,
-                weights: weights
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const result = await response.json();
@@ -473,4 +494,104 @@ function restoreSectionStates() {
             }
         }
     });
+}
+
+/**
+ * 선택한 날짜에 수집된 카테고리 불러오기
+ */
+async function loadAvailableCategories() {
+    const viewDate = document.getElementById('view-date').value;
+    const container = document.getElementById('category-filters');
+
+    if (!viewDate) {
+        container.innerHTML = '<p style="color: #888;">날짜를 선택해주세요.</p>';
+        return;
+    }
+
+    try {
+        // 해당 날짜의 모든 비디오를 가져와서 카테고리 추출
+        const response = await fetch('/api/videos', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                snapshot_date: viewDate,
+                data_source: 'all',
+                limit: 1000
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.data.length > 0) {
+            // 카테고리 ID 추출 (중복 제거) - video_category_id 사용 (실제 비디오 카테고리)
+            const categoryIds = [...new Set(result.data.map(v => v.video_category_id).filter(id => id))];
+
+            // 카테고리 이름 매핑
+            const categoryNames = {
+                '1': '영화 및 애니메이션',
+                '2': '자동차 및 차량',
+                '10': '음악',
+                '15': '애완동물 및 동물',
+                '17': '스포츠',
+                '19': '여행 및 이벤트',
+                '20': '게임',
+                '22': '사람 및 블로그',
+                '23': '코미디',
+                '24': '엔터테인먼트',
+                '25': '뉴스 및 정치',
+                '26': '노하우 및 스타일',
+                '27': '교육',
+                '28': '과학 및 기술',
+                '29': '비영리 및 행동주의'
+            };
+
+            // 체크박스 생성
+            container.innerHTML = categoryIds.map(catId => {
+                const categoryName = categoryNames[catId] || `카테고리 ${catId}`;
+
+                return `
+                    <div class="checkbox-item">
+                        <input type="checkbox"
+                               id="filter-${catId}"
+                               value="${catId}"
+                               class="category-filter-checkbox"
+                               checked>
+                        <label for="filter-${catId}">${categoryName}</label>
+                    </div>
+                `;
+            }).join('');
+
+            // 체크박스 변경 시 자동으로 재계산
+            document.querySelectorAll('.category-filter-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', recalculateViewScores);
+            });
+        } else {
+            container.innerHTML = '<p style="color: #888;">해당 날짜에 수집된 데이터가 없습니다.</p>';
+        }
+    } catch (error) {
+        console.error('카테고리 로드 실패:', error);
+        container.innerHTML = '<p style="color: #f44;">카테고리 로드 실패</p>';
+    }
+}
+
+/**
+ * 카테고리 필터 전체 선택
+ */
+function selectAllFilters() {
+    document.querySelectorAll('.category-filter-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    recalculateViewScores();
+}
+
+/**
+ * 카테고리 필터 전체 해제
+ */
+function deselectAllFilters() {
+    document.querySelectorAll('.category-filter-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    recalculateViewScores();
 }

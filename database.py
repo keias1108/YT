@@ -55,24 +55,6 @@ def init_database():
         )
     """)
 
-    # 3. senior_scores 테이블: 시니어 점수 계산 결과 (DEPRECATED - 사용 안함)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS senior_scores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            video_id TEXT NOT NULL,
-            snapshot_id INTEGER,
-            score REAL NOT NULL,
-            keyword_score REAL DEFAULT 0,
-            genre_score REAL DEFAULT 0,
-            comment_score REAL DEFAULT 0,
-            channel_score REAL DEFAULT 0,
-            length_score REAL DEFAULT 0,
-            highlights TEXT,  -- JSON: 매칭된 키워드, 근거 등
-            calculated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (video_id) REFERENCES videos(video_id),
-            FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
-        )
-    """)
 
     # 3.5. view_scores 테이블: ViewScore 계산 결과 (NEW)
     cursor.execute("""
@@ -133,7 +115,6 @@ def init_database():
     # 인덱스 생성
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_date ON snapshots(snapshot_date)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_video ON snapshots(video_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_senior_scores_video ON senior_scores(video_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_view_scores_video ON view_scores(video_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_view_scores_snapshot ON view_scores(snapshot_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_labels_video ON labels(video_id)")
@@ -141,7 +122,7 @@ def init_database():
 
     conn.commit()
     conn.close()
-    print("✓ 데이터베이스 초기화 완료")
+    print("[OK] Database initialized successfully")
 
 
 def insert_video(video_data: Dict[str, Any]) -> None:
@@ -201,30 +182,6 @@ def insert_snapshot(snapshot_data: Dict[str, Any]) -> Optional[int]:
         return None
 
 
-def insert_senior_score(score_data: Dict[str, Any]) -> None:
-    """시니어 점수 삽입"""
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        INSERT INTO senior_scores
-        (video_id, snapshot_id, score, keyword_score, genre_score,
-         comment_score, channel_score, length_score, highlights)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        score_data['video_id'],
-        score_data.get('snapshot_id'),
-        score_data['score'],
-        score_data.get('keyword_score', 0),
-        score_data.get('genre_score', 0),
-        score_data.get('comment_score', 0),
-        score_data.get('channel_score', 0),
-        score_data.get('length_score', 0),
-        json.dumps(score_data.get('highlights', {}), ensure_ascii=False)
-    ))
-
-    conn.commit()
-    conn.close()
 
 
 def insert_view_score(score_data: Dict[str, Any]) -> None:
@@ -265,11 +222,9 @@ def get_snapshots_by_date(date: str) -> List[Dict[str, Any]]:
 
     cursor.execute("""
         SELECT s.*, v.title, v.channel_title, v.thumbnail_url,
-               v.channel_id, v.published_at,
-               ss.score as senior_score, ss.highlights
+               v.channel_id, v.published_at
         FROM snapshots s
         JOIN videos v ON s.video_id = v.video_id
-        LEFT JOIN senior_scores ss ON s.id = ss.snapshot_id
         WHERE s.snapshot_date = ?
         ORDER BY s.rank_position
     """, (date,))
@@ -279,13 +234,14 @@ def get_snapshots_by_date(date: str) -> List[Dict[str, Any]]:
     return results
 
 
-def get_snapshots_by_date_and_source(date: str, data_source: str = 'all') -> List[Dict[str, Any]]:
+def get_snapshots_by_date_and_source(date: str, data_source: str = 'all', category_ids: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """
     특정 날짜의 스냅샷 조회 (데이터 소스 필터링)
 
     Args:
         date: 조회 날짜 (YYYY-MM-DD)
         data_source: 'channel' (채널 기반), 'category' (카테고리 기반), 'all' (전체)
+        category_ids: 필터링할 카테고리 ID 리스트 (None이면 전체)
 
     Returns:
         필터링된 스냅샷 리스트
@@ -296,14 +252,28 @@ def get_snapshots_by_date_and_source(date: str, data_source: str = 'all') -> Lis
     # 데이터 소스에 따라 WHERE 절 구성
     if data_source == 'channel':
         where_clause = "s.snapshot_date = ? AND s.category_id LIKE 'channel:%'"
+        params = [date]
     elif data_source == 'category':
         where_clause = "s.snapshot_date = ? AND s.category_id NOT LIKE 'channel:%'"
+        params = [date]
     else:  # 'all'
         where_clause = "s.snapshot_date = ?"
+        params = [date]
+
+    # 카테고리 필터링 추가
+    if category_ids and len(category_ids) > 0:
+        placeholders = ','.join(['?' for _ in category_ids])
+        if data_source == 'channel':
+            # 채널 기반: videos.category_id로 필터링 (실제 비디오 카테고리)
+            where_clause += f" AND v.category_id IN ({placeholders})"
+        else:
+            # 카테고리 기반: snapshots.category_id로 필터링
+            where_clause += f" AND s.category_id IN ({placeholders})"
+        params.extend(category_ids)
 
     cursor.execute(f"""
         SELECT s.*, v.title, v.channel_title, v.thumbnail_url,
-               v.channel_id, v.published_at,
+               v.channel_id, v.published_at, v.category_id as video_category_id,
                vs.score as view_score, vs.view_score as view_component,
                vs.subscriber_score, vs.recency_score, vs.engagement_score
         FROM snapshots s
@@ -311,7 +281,7 @@ def get_snapshots_by_date_and_source(date: str, data_source: str = 'all') -> Lis
         LEFT JOIN view_scores vs ON s.id = vs.snapshot_id
         WHERE {where_clause}
         ORDER BY s.rank_position
-    """, (date,))
+    """, tuple(params))
 
     results = [dict(row) for row in cursor.fetchall()]
     conn.close()

@@ -120,6 +120,7 @@ def get_videos():
         "sort_by": "view_score",
         "order": "desc",
         "limit": 100,
+        "category_ids": ["10", "15"],
         "weights": {
             "view": 1.0,
             "subscriber": 1.0,
@@ -135,13 +136,14 @@ def get_videos():
         sort_by = data.get('sort_by', 'view_score')
         order = data.get('order', 'desc')
         limit = int(data.get('limit', 100))
+        category_ids = data.get('category_ids', None)
         weights = data.get('weights', view_score_calculator.DEFAULT_WEIGHTS)
 
         if not snapshot_date:
             snapshot_date = datetime.now().strftime('%Y-%m-%d')
 
-        # 스냅샷 + 채널 정보 조회
-        snapshots = database.get_snapshots_by_date_and_source(snapshot_date, data_source)
+        # 스냅샷 + 채널 정보 조회 (카테고리 필터 포함)
+        snapshots = database.get_snapshots_by_date_and_source(snapshot_date, data_source, category_ids)
 
         # 채널 정보 일괄 조회
         channel_ids = list(set([s['channel_id'] for s in snapshots]))

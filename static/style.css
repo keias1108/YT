@@ -204,6 +204,22 @@ section h2 {
     background: #218838;
 }
 
+.btn-small {
+    padding: 5px 12px;
+    font-size: 0.85em;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-small:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
 /* 상태 메시지 */
 .status-message {
     margin-top: 15px;
