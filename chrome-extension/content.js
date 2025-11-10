@@ -331,9 +331,148 @@ function addButtonToChannelPage() {
     console.log(`[시니어 채널] ✓ 채널 페이지 버튼 추가 완료`);
 }
 
+// 스크립트 추출 및 클립보드 복사 함수
+async function copyTranscriptToClipboard() {
+    console.log('[스크립트 복사] 시작');
+
+    const button = document.getElementById('transcript-copy-btn');
+    const originalText = button ? button.innerHTML : '';
+
+    try {
+        // 버튼 상태 변경
+        if (button) {
+            button.innerHTML = '⏳ 로딩 중...';
+            button.disabled = true;
+        }
+
+        // 스크립트 패널 찾기
+        let transcriptPanel = document.querySelector('ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]');
+
+        // 패널의 visibility 확인
+        const isHidden = !transcriptPanel ||
+                        transcriptPanel.getAttribute('visibility') === 'ENGAGEMENT_PANEL_VISIBILITY_HIDDEN';
+
+        // 세그먼트 개수 확인
+        let segments = transcriptPanel ? transcriptPanel.querySelectorAll('ytd-transcript-segment-renderer') : [];
+        const needsLoad = isHidden || segments.length === 0;
+
+        // 스크립트 패널이 없거나 숨겨져 있으면 자동으로 열기
+        if (needsLoad) {
+            console.log('[스크립트 복사] 스크립트 패널이 없음 - 자동 로드 시작');
+
+            // 1. 더보기 버튼 클릭 (필요시)
+            const expandButton = document.querySelector('tp-yt-paper-button#expand');
+            if (expandButton && expandButton.getAttribute('aria-expanded') === 'false') {
+                console.log('[스크립트 복사] 더보기 버튼 클릭');
+                expandButton.click();
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            // 2. 스크립트 표시 버튼 찾기 및 클릭
+            const transcriptButton = document.querySelector('button[aria-label*="스크립트"]');
+            if (!transcriptButton) {
+                throw new Error('이 동영상에는 스크립트가 없습니다.');
+            }
+
+            console.log('[스크립트 복사] 스크립트 표시 버튼 클릭');
+            transcriptButton.click();
+
+            // 3. 스크립트 패널이 로드될 때까지 대기 (최대 3초)
+            let attempts = 0;
+            while (attempts < 30) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                transcriptPanel = document.querySelector('ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]');
+                if (transcriptPanel) {
+                    // 패널의 visibility 확인
+                    const visibility = transcriptPanel.getAttribute('visibility');
+                    if (visibility !== 'ENGAGEMENT_PANEL_VISIBILITY_HIDDEN') {
+                        console.log('[스크립트 복사] 스크립트 패널 로드 완료');
+                        break;
+                    }
+                }
+                attempts++;
+            }
+
+            if (!transcriptPanel) {
+                throw new Error('스크립트 로딩 시간 초과');
+            }
+
+            // 스크립트 세그먼트가 실제로 로드될 때까지 대기 (최대 5초)
+            console.log('[스크립트 복사] 세그먼트 로딩 대기 중...');
+            let segmentAttempts = 0;
+            while (segmentAttempts < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                segments = transcriptPanel.querySelectorAll('ytd-transcript-segment-renderer');
+                if (segments.length > 0) {
+                    console.log(`[스크립트 복사] 세그먼트 로드 완료 (${segments.length}개)`);
+                    break;
+                }
+                segmentAttempts++;
+            }
+
+            if (segments.length === 0) {
+                throw new Error('스크립트 세그먼트 로딩 시간 초과');
+            }
+        }
+
+        // 모든 스크립트 세그먼트 가져오기 (다시 확인)
+        segments = transcriptPanel.querySelectorAll('ytd-transcript-segment-renderer');
+
+        if (segments.length === 0) {
+            throw new Error('스크립트가 비어있습니다.');
+        }
+
+        console.log(`[스크립트 복사] ${segments.length}개 세그먼트 발견`);
+
+        // 타임스탬프 제거하고 텍스트만 추출
+        const textOnly = Array.from(segments)
+            .map(segment => {
+                const textElement = segment.querySelector('.segment-text');
+                return textElement ? textElement.textContent.trim() : '';
+            })
+            .filter(text => text.length > 0)
+            .join(' ');
+
+        if (!textOnly) {
+            throw new Error('추출할 텍스트가 없습니다.');
+        }
+
+        // 클립보드에 복사
+        try {
+            await navigator.clipboard.writeText(textOnly);
+            alert(`스크립트가 클립보드에 복사되었습니다!\n\n길이: ${textOnly.length}자`);
+            console.log('[스크립트 복사] 성공:', textOnly.length, '자');
+        } catch (err) {
+            console.error('[스크립트 복사] clipboard API 실패, fallback 시도:', err);
+            // Fallback: textarea 사용
+            const textarea = document.createElement('textarea');
+            textarea.value = textOnly;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert(`스크립트가 클립보드에 복사되었습니다!\n\n길이: ${textOnly.length}자`);
+            console.log('[스크립트 복사] Fallback 성공');
+        }
+
+    } catch (error) {
+        console.error('[스크립트 복사] 오류:', error);
+        alert(`스크립트 복사 실패:\n${error.message}`);
+    } finally {
+        // 버튼 상태 복원
+        if (button) {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    }
+}
+
 // 동영상 페이지에 버튼 추가
 function addButtonToVideoPage() {
-    if (document.getElementById('senior-channel-btn')) {
+    // 이미 버튼이 추가되어 있으면 리턴
+    if (document.getElementById('senior-channel-btn') || document.getElementById('transcript-copy-btn')) {
         return;
     }
 
@@ -352,6 +491,7 @@ function addButtonToVideoPage() {
         return;
     }
 
+    // 채널 등록 버튼
     const button = createButton(channelId);
     button.style.cssText = `
         margin-left: 12px !important;
@@ -362,6 +502,24 @@ function addButtonToVideoPage() {
 
     subscribeContainer.appendChild(button);
     console.log(`[시니어 채널] ✓ 동영상 페이지 버튼 추가 완료`);
+
+    // 스크립트 복사 버튼
+    const transcriptButton = document.createElement('button');
+    transcriptButton.id = 'transcript-copy-btn';
+    transcriptButton.className = 'transcript-copy-button';
+    transcriptButton.innerHTML = '📝 스크립트 복사';
+    transcriptButton.title = '동영상 스크립트를 타임스탬프 없이 클립보드에 복사';
+    transcriptButton.style.cssText = `
+        margin-left: 12px !important;
+        padding: 8px 16px !important;
+        font-size: 13px !important;
+        height: 36px !important;
+    `;
+
+    transcriptButton.onclick = copyTranscriptToClipboard;
+
+    subscribeContainer.appendChild(transcriptButton);
+    console.log(`[스크립트 복사] ✓ 스크립트 복사 버튼 추가 완료`);
 }
 
 // 페이지 로드 및 변경 감지

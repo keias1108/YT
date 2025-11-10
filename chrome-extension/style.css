@@ -68,3 +68,34 @@
 .senior-channel-button:active {
     transform: translateY(0) !important;
 }
+
+/* 스크립트 복사 버튼 스타일 */
+.transcript-copy-button {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    margin: 0 !important;
+    padding: 10px 20px !important;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 20px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3) !important;
+    z-index: 9999 !important;
+    position: relative !important;
+    white-space: nowrap !important;
+}
+
+.transcript-copy-button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.5) !important;
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+}
+
+.transcript-copy-button:active {
+    transform: translateY(0) !important;
+}

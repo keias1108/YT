@@ -5,7 +5,8 @@
   "description": "유튜브 채널을 시니어 트렌드 추적 시스템에 바로 등록하세요",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "http://localhost:5000/*",
