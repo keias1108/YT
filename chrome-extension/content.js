@@ -1,5 +1,11 @@
 /**
  * 유튜브 페이지에서 채널 ID 추출 및 등록 버튼 추가
+ *
+ * 📌 YouTube DOM 구조 참조: YOUTUBE_DOM_STRUCTURE.md
+ *    - 검색 페이지 셀렉터
+ *    - Watch 페이지 관련 영상 셀렉터
+ *    - 채널 페이지 버튼 위치
+ *    - 디버깅 팁 및 예제 코드
  */
 
 // 현재 페이지의 채널 ID 추출
@@ -85,6 +91,7 @@ function loadRegisteredChannels() {
 }
 
 // 검색 결과의 비디오 항목에 마크 추가
+// DOM 구조: YOUTUBE_DOM_STRUCTURE.md > "1. 검색 결과 페이지" 참조
 function markSearchResults() {
     const videoRenderers = document.querySelectorAll('ytd-video-renderer');
     console.log('[시니어 채널] 검색 결과 비디오 수:', videoRenderers.length);
@@ -178,6 +185,97 @@ async function initSearchPage() {
     });
 
     console.log('[시니어 채널] 무한 스크롤 감지 시작 (2초마다 비디오 개수 체크)');
+}
+
+// Watch 페이지인지 확인 (관련 영상 마킹용)
+function isWatchPage() {
+    return window.location.pathname === '/watch';
+}
+
+// 관련 영상에 마크 추가
+// DOM 구조: YOUTUBE_DOM_STRUCTURE.md > "2. 영상 시청 페이지 (Watch Page)" 참조
+function markRelatedVideos() {
+    const lockups = document.querySelectorAll('#related yt-lockup-view-model');
+    console.log('[시니어 채널] 관련 영상 수:', lockups.length);
+
+    let markedCount = 0;
+
+    lockups.forEach((lockup, index) => {
+        // 이미 처리된 항목은 스킵
+        if (lockup.dataset.seniorChecked === 'true') return;
+        lockup.dataset.seniorChecked = 'true';
+
+        // 채널명 추출 (.yt-core-attributed-string의 두 번째 요소)
+        const textElements = lockup.querySelectorAll('.yt-core-attributed-string');
+        if (textElements.length < 2) {
+            console.warn('[시니어 채널] 채널명을 찾을 수 없음:', index);
+            return;
+        }
+
+        const channelName = textElements[1].textContent.trim().toLowerCase();
+
+        // 첫 3개만 로그 (디버깅)
+        if (index < 3) {
+            console.log(`[시니어 채널] 관련 영상 ${index}: "${channelName}"`);
+        }
+
+        // 등록된 채널인지 확인
+        if (registeredChannelNames.has(channelName)) {
+            const channelNameRow = textElements[1].parentElement;
+
+            // 이미 마크가 있으면 스킵
+            if (channelNameRow.querySelector('.senior-channel-mark')) return;
+
+            // 체크 마크 추가
+            const mark = document.createElement('span');
+            mark.className = 'senior-channel-mark';
+            mark.innerHTML = '✅';
+            mark.title = '시니어 채널로 등록됨';
+            mark.style.marginLeft = '6px';
+
+            channelNameRow.appendChild(mark);
+            markedCount++;
+            console.log('[시니어 채널] 관련 영상 마크 추가:', channelName);
+        }
+    });
+
+    console.log(`[시니어 채널] 총 ${markedCount}개 관련 영상에 마크 추가됨`);
+}
+
+// 관련 영상 무한 스크롤 감지 (MutationObserver)
+function setupRelatedVideosObserver() {
+    const relatedSection = document.querySelector('#related');
+    if (!relatedSection) {
+        console.warn('[시니어 채널] #related 섹션을 찾을 수 없음');
+        return;
+    }
+
+    console.log('[시니어 채널] MutationObserver 설정 시작');
+
+    const observer = new MutationObserver(() => {
+        markRelatedVideos();
+    });
+
+    observer.observe(relatedSection, {
+        childList: true,
+        subtree: true
+    });
+
+    console.log('[시니어 채널] 관련 영상 무한 스크롤 감지 시작 (MutationObserver)');
+}
+
+// Watch 페이지 초기화
+async function initWatchPage() {
+    console.log('[시니어 채널] Watch 페이지 초기화');
+
+    // 채널명 로드
+    await loadRegisteredChannels();
+
+    // 현재 관련 영상에 마크 추가
+    markRelatedVideos();
+
+    // MutationObserver 설정
+    setupRelatedVideosObserver();
 }
 
 // 버튼 생성 (공통 함수) - 채널 확인 후 적절한 버튼 생성
@@ -527,11 +625,13 @@ function init() {
     const isChannel = isChannelPage();
     const isVideo = isVideoPage();
     const isSearch = isSearchPage();
+    const isWatch = isWatchPage();
 
     console.log('[시니어 채널] 페이지 타입:', {
         채널: isChannel,
         동영상: isVideo,
         검색: isSearch,
+        Watch: isWatch,
         URL: window.location.href
     });
 
@@ -539,6 +639,12 @@ function init() {
     if (isSearch) {
         initSearchPage();
         return;
+    }
+
+    // Watch 페이지 (관련 영상 마킹)
+    if (isWatch) {
+        initWatchPage();
+        // Watch 페이지에서도 버튼 추가는 계속 진행
     }
 
     // 채널 또는 동영상 페이지 (버튼 추가)
