@@ -44,6 +44,49 @@ function extractChannelId() {
     return null;
 }
 
+// 특정 요소가 DOM에 나타날 때까지 대기하는 헬퍼 함수
+function waitForElement(selector, timeout = 10000) {
+    return new Promise((resolve) => {
+        // 이미 존재하면 즉시 반환
+        const element = document.querySelector(selector);
+        if (element) {
+            console.log(`[대기 완료] ${selector} 즉시 발견`);
+            resolve(element);
+            return;
+        }
+
+        console.log(`[대기 시작] ${selector} 로딩 대기 중...`);
+
+        // MutationObserver로 DOM 변경 감시
+        const observer = new MutationObserver((mutations, obs) => {
+            const element = document.querySelector(selector);
+            if (element) {
+                console.log(`[대기 완료] ${selector} 발견됨`);
+                obs.disconnect();
+                resolve(element);
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        // 타임아웃 설정
+        setTimeout(() => {
+            observer.disconnect();
+            const element = document.querySelector(selector);
+            if (element) {
+                console.log(`[대기 완료] ${selector} 타임아웃 후 발견`);
+                resolve(element);
+            } else {
+                console.warn(`[대기 실패] ${selector} 타임아웃 (${timeout}ms)`);
+                resolve(null);
+            }
+        }, timeout);
+    });
+}
+
 // 채널 페이지인지 확인
 function isChannelPage() {
     const path = window.location.pathname;
@@ -397,6 +440,24 @@ async function initWatchPage() {
 
     // 인기 영상 설정 로드
     await loadTrendingSettings();
+
+    // #related 섹션이 로드될 때까지 대기 (최대 10초)
+    const relatedSection = await waitForElement('#related', 10000);
+
+    if (!relatedSection) {
+        console.warn('[시니어 채널] #related 섹션을 찾을 수 없음 - Watch 페이지 초기화 실패');
+        return;
+    }
+
+    // 관련 영상이 실제로 로드될 때까지 추가 대기 (최대 3초)
+    const lockup = await waitForElement('#related yt-lockup-view-model', 3000);
+
+    if (!lockup) {
+        console.warn('[시니어 채널] 관련 영상이 로드되지 않음');
+        // 그래도 Observer는 설정 (나중에 로드될 수 있으므로)
+        setupRelatedVideosObserver();
+        return;
+    }
 
     // 현재 관련 영상에 마크 추가
     markRelatedVideos();
@@ -792,9 +853,9 @@ function init() {
     // 즉시 시도
     addButtonFunction();
 
-    // 재시도 메커니즘
+    // 재시도 메커니즘 (간격: 1.5초, 최대: 8회)
     let retryCount = 0;
-    const maxRetries = 5;
+    const maxRetries = 8;
     const retryInterval = setInterval(() => {
         retryCount++;
         const buttonExists = document.getElementById('senior-channel-btn');
@@ -803,13 +864,13 @@ function init() {
             console.log('[시니어 채널] 버튼 추가 성공');
             clearInterval(retryInterval);
         } else if (retryCount >= maxRetries) {
-            console.warn('[시니어 채널] 버튼 추가 실패 (최대 재시도 도달)');
+            console.warn('[시니어 채널] 버튼 추가 실패 (최대 재시도 도달) - 관련 영상 마킹은 계속 진행');
             clearInterval(retryInterval);
         } else {
             console.log(`[시니어 채널] 재시도 ${retryCount}/${maxRetries}`);
             addButtonFunction();
         }
-    }, 1000);
+    }, 1500); // 1초 → 1.5초로 변경
 }
 
 // 메시지 리스너 (popup에서 설정 변경 시)
@@ -850,7 +911,7 @@ new MutationObserver(() => {
         lastUrl = url;
         console.log('[시니어 채널] URL 변경 감지:', url);
 
-        // 새 페이지에서 다시 시도
-        setTimeout(() => init(), 800);
+        // 새 페이지에서 다시 시도 (800ms → 1000ms로 변경)
+        setTimeout(() => init(), 1000);
     }
 }).observe(document, { subtree: true, childList: true });
