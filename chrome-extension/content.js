@@ -252,8 +252,27 @@ function setupRelatedVideosObserver() {
 
     console.log('[시니어 채널] MutationObserver 설정 시작');
 
+    // 이전 관련 영상 개수 추적
+    let previousLockupCount = document.querySelectorAll('#related yt-lockup-view-model').length;
+    let debounceTimer = null;
+
     const observer = new MutationObserver(() => {
-        markRelatedVideos();
+        // 기존 타이머 취소 (debounce: 연속된 이벤트를 하나로 묶음)
+        if (debounceTimer) {
+            clearTimeout(debounceTimer);
+        }
+
+        // 500ms 후에 실행 (호버 등 빠른 DOM 변경은 무시)
+        debounceTimer = setTimeout(() => {
+            const currentLockupCount = document.querySelectorAll('#related yt-lockup-view-model').length;
+
+            // 개수가 실제로 증가했을 때만 실행
+            if (currentLockupCount > previousLockupCount) {
+                console.log(`[시니어 채널] 새 관련 영상 감지 (${previousLockupCount} → ${currentLockupCount})`);
+                previousLockupCount = currentLockupCount;
+                markRelatedVideos();
+            }
+        }, 500);
     });
 
     observer.observe(relatedSection, {
@@ -261,7 +280,7 @@ function setupRelatedVideosObserver() {
         subtree: true
     });
 
-    console.log('[시니어 채널] 관련 영상 무한 스크롤 감지 시작 (MutationObserver)');
+    console.log('[시니어 채널] 관련 영상 무한 스크롤 감지 시작 (MutationObserver + debounce)');
 }
 
 // Watch 페이지 초기화
