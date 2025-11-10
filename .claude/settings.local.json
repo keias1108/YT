@@ -15,7 +15,9 @@
       "Bash(/usr/bin/python3:*)",
       "Bash(venv/Scripts/python.exe:*)",
       "Bash(venv/bin/python:*)",
-      "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe:*)"
+      "Bash(PYTHONIOENCODING=utf-8 venv/Scripts/python.exe:*)",
+      "Bash(cat:*)",
+      "Bash(git -C \"/mnt/c/Users/82103/Desktop/py/youtube api\" log --oneline --all)"
     ],
     "deny": [],
     "ask": []

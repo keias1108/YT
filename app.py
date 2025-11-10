@@ -676,8 +676,9 @@ def collect_from_channels():
 
     Request Body:
         {
-            "max_results": 50,  // 채널당 수집 수
-            "days": 7           // 최근 N일
+            "max_results": 50,        // 채널당 수집 수
+            "days": 7,                // 최근 N일
+            "skip_today_collected": false  // 오늘 수집한 채널 건너뛰기
         }
 
     Returns:
@@ -687,6 +688,7 @@ def collect_from_channels():
         data = request.get_json() or {}
         max_results = data.get('max_results', 50)
         days = data.get('days', 7)
+        skip_today_collected = data.get('skip_today_collected', False)
 
         # 등록된 채널 조회
         conn = database.get_connection()
@@ -712,7 +714,8 @@ def collect_from_channels():
         stats = data_collector.collect_from_channels(
             channel_ids=channel_ids,
             max_results_per_channel=max_results,
-            days=days
+            days=days,
+            skip_today_collected=skip_today_collected
         )
 
         return jsonify({
